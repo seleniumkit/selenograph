@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns="urn:gridrouter.selenograph.qatools.ru"
+            targetNamespace="urn:gridrouter.selenograph.qatools.ru"
+            xmlns:jaxb="http://java.sun.com/xml/ns/jaxb"
+            xmlns:inheritance="http://jaxb2-commons.dev.java.net/basic/inheritance"
+            jaxb:extensionBindingPrefixes="inheritance"
+            elementFormDefault="qualified">
+
+    <xsd:complexType name="BrowserContext" abstract="true">
+        <xsd:annotation>
+            <xsd:appinfo>
+                <inheritance:extends>
+                    ru.qatools.selenograph.gridrouter.Timestamped&lt;ru.qatools.selenograph.gridrouter.BrowserContext&gt;
+                </inheritance:extends>
+            </xsd:appinfo>
+        </xsd:annotation>
+        <xsd:attribute name="browser" type="xsd:string" use="optional"/>
+        <xsd:attribute name="version" type="xsd:string" use="optional"/>
+        <xsd:attribute name="user" type="xsd:string" use="optional"/>
+    </xsd:complexType>
+
+    <xsd:complexType name="SessionsState">
+        <xsd:complexContent>
+            <xsd:extension base="BrowserContext">
+                <xsd:attribute name="max" type="xsd:int" use="required"/>
+                <xsd:attribute name="avg" type="xsd:int" use="required"/>
+                <xsd:attribute name="raw" type="xsd:int" use="required"/>
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
+    <!-- events -->
+    <xsd:complexType name="SessionEvent" abstract="true">
+        <xsd:complexContent>
+            <xsd:extension base="BrowserContext">
+                <xsd:attribute name="sessionId" type="xsd:string" use="required"/>
+                <xsd:attribute name="route" type="xsd:string" use="required"/>
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="StartSessionEvent">
+        <xsd:complexContent>
+            <xsd:extension base="SessionEvent">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+    <xsd:complexType name="DeleteSessionEvent">
+        <xsd:complexContent>
+            <xsd:extension base="SessionEvent">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+    <xsd:complexType name="UndefinedSessionState">
+        <xsd:complexContent>
+            <xsd:extension base="SessionEvent">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+</xsd:schema>

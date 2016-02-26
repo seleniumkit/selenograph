@@ -1,0 +1,9 @@
+<qa:browsers xmlns:qa="urn:config.gridrouter.qatools.ru">
+    <browser name="firefox" defaultVersion="">
+        <version number="32.0">
+            <region name="first">
+                <host name="hub2" port="4444" count="1"/>
+            </region>
+        </version>
+    </browser>
+</qa:browsers>

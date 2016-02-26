@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>selenograph</artifactId>
+        <groupId>ru.qatools.seleniumkit</groupId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <packaging>war</packaging>
+
+    <artifactId>selenograph-server</artifactId>
+    <properties>
+        <jetty.version>9.2.15.v20160210</jetty.version>
+        <gridrouter.config.users.file>/etc/grid-router/users.properties</gridrouter.config.users.file>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>ru.yandex.qatools.camelot</groupId>
+            <artifactId>camelot-web</artifactId>
+            <type>war</type>
+        </dependency>
+        <dependency>
+            <groupId>ru.yandex.qatools.camelot</groupId>
+            <artifactId>camelot-web</artifactId>
+            <classifier>classes</classifier>
+        </dependency>
+        <dependency>
+            <groupId>ru.qatools.seleniumkit</groupId>
+            <artifactId>selenograph-service</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.yandex.qatools.camelot</groupId>
+            <artifactId>camelot-serialize-fst</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.yandex.qatools.camelot</groupId>
+            <artifactId>camelot-mongodb</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-maven-plugin</artifactId>
+                <version>${jetty.version}</version>
+                <configuration>
+                    <scanIntervalSeconds>0</scanIntervalSeconds>
+                    <webApp>
+                        <contextPath>/</contextPath>
+                        <allowDuplicateFragmentNames>true</allowDuplicateFragmentNames>
+                    </webApp>
+                    <stopPort>9847</stopPort>
+                    <stopKey>tms-local</stopKey>
+                    <loginServices>
+                        <loginService implementation="org.eclipse.jetty.security.HashLoginService">
+                            <name>Selenium Grid Router</name>
+                            <config>${gridrouter.config.users.file}</config>
+                        </loginService>
+                    </loginServices>
+                    <goal>run-forked</goal>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.eclipse.jetty</groupId>
+                        <artifactId>jetty-continuation</artifactId>
+                        <version>${jetty.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.eclipse.jetty</groupId>
+                        <artifactId>jetty-servlet</artifactId>
+                        <version>${jetty.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.eclipse.jetty.websocket</groupId>
+                        <artifactId>websocket-server</artifactId>
+                        <version>${jetty.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>2.6</version>
+                <configuration>
+                    <overlays>
+                        <overlay>
+                            <groupId>ru.yandex.qatools.camelot</groupId>
+                            <artifactId>camelot-web</artifactId>
+                            <includes>
+                                <exclude>WEB-INF/classes/camelot-web-context.xml</exclude>
+                            </includes>
+                        </overlay>
+                    </overlays>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <version>0.0.28</version>
+                <executions>
+                    <execution>
+                        <id>install node and npm</id>
+                        <goals>
+                            <goal>install-node-and-npm</goal>
+                        </goals>
+                        <configuration>
+                            <nodeVersion>v4.3.1</nodeVersion>
+                            <npmVersion>3.7.4</npmVersion>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm install</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>install</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <phase>prepare-package</phase>
+                        <id>webpack build</id>
+                        <goals>
+                            <goal>webpack</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

@@ -1,0 +1,17 @@
+*.class
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+target
+.idea
+*.iml
+*.ipr
+*.iws
+
+overlays
+server/node
+server/node_modules
+npm-debug.log
