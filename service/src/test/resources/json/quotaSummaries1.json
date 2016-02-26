@@ -41,18 +41,6 @@
   ],
   "user2": [
     {
-      "versions": [
-        {
-          "version": "32.0",
-          "running": 3,
-          "max": 4
-        }
-      ],
-      "name": "firefox",
-      "running": 3,
-      "max": 4
-    },
-    {
       "name": "chrome",
       "max": 7,
       "running": 2,
@@ -63,6 +51,18 @@
           "version": "32.0"
         }
       ]
+    },
+    {
+      "versions": [
+        {
+          "version": "32.0",
+          "running": 3,
+          "max": 4
+        }
+      ],
+      "name": "firefox",
+      "running": 3,
+      "max": 4
     }
   ]
 }
