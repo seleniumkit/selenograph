@@ -20,9 +20,18 @@ Although it's recommended to use a replica set (at least 3 nodes of MongoDB), yo
 ## Installation
 
 For Ubuntu users we provide deb packages. Please note that yandex-selenograph package conflicts with 
-yandex-grid-router, so if you have previously installed Selenium Grid Router, you'll need to uninstall it first.
+yandex-grid-router, so if you have previously installed Selenium Grid Router, you'll need to uninstall it first. 
+
+Also ensure that you have Java 8 installed:
 ```
-$ sudo add-apt-repository ppa:yandex-qatools/gridrouter
+$ sudo add-apt-repository ppa:webupd8team/java
+$ sudo apt-get update
+$ sudo apt-get install oracle-java8-installer
+```
+
+To install Selenograph itself:
+```
+$ sudo add-apt-repository ppa:yandex-qatools/selenograph
 $ sudo apt-get update
 $ sudo apt-get install yandex-selenograph
 $ sudo service yandex-selenograph start
