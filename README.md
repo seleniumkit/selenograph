@@ -1,4 +1,6 @@
 # Selenograph
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/ru.qatools.seleniumkit/selenograph/badge.svg?style=flat)](https://maven-badges.herokuapp.com/maven-central/ru.qatools.seleniumkit/selenograph) 
+[![Build status](http://ci.qatools.ru/job/pessimistic-mongodb_master-deploy/badge/icon)](http://ci.qatools.ru/job/selenograph_master-deploy/) 
 
 **Selenograph** is a powered version of [Selenium Grid Router](https://github.com/seleniumkit/gridrouter) 
 providing more information about currently running Selenium sessions and hubs state.
