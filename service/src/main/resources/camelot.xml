@@ -47,6 +47,9 @@
                 brokerConfig="?concurrentConsumers=1">
             <processor>ru.qatools.selenograph.gridrouter.QuotaSummaryClientNotifier</processor>
         </plugin>
+        <plugin id="requestsQueue" source="quotaClientNotifier">
+            <aggregator>ru.qatools.selenograph.gridrouter.QueueWaitAvailableBrowsersChecker</aggregator>
+        </plugin>
         <plugin id="quotaStats" source="quotaClientNotifier">
             <aggregator>ru.qatools.selenograph.gridrouter.QuotaStatsAggregator</aggregator>
         </plugin>

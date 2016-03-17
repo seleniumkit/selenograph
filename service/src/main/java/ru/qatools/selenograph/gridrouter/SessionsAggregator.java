@@ -141,12 +141,22 @@ public class SessionsAggregator implements StatsCounter {
                 .collect(toList()), repo.valuesMap());
     }
 
+    @Override
+    public int getSessionsCountForUser(String user) {
+        return (int) countSessionsByUser(user);
+    }
+
+    @Override
+    public int getSessionsCountForUserAndBrowser(String user, String browser, String version) {
+        return (int) countSessionsByUserAndBrowser(user, browser, version);
+    }
+
     public long countSessionsByUser(String user) {
         return repo.keys().stream().filter(s -> s.startsWith(user + ":")).count();
     }
 
     public long countSessionsByUserAndBrowser(String user, String browser, String version) {
-        return repo.keys().stream().filter(s -> s.startsWith(user + ":" + browser+ ":" + version)).count();
+        return repo.keys().stream().filter(s -> s.startsWith(user + ":" + browser + ":" + version)).count();
     }
 
     public SessionEvent findSessionById(String sessionId) {

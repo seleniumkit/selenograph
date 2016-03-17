@@ -107,7 +107,7 @@ public class QuotaSummaryAggregator {
     }
 
     private static List<VersionSummary> toVersionSummaries(Browser browser, HubBrowserSummariesMap hubs) {
-        return browser.getVersions().stream()
+        return browser.getVersions().parallelStream()
                 .map(version -> toVersionSummary(version, hubs, browserName(browser.getName())))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
@@ -115,7 +115,7 @@ public class QuotaSummaryAggregator {
     }
 
     private static Optional<VersionSummary> toVersionSummary(Version version, HubBrowserSummariesMap hubs, String browser) {
-        return version.getRegions().stream()
+        return version.getRegions().parallelStream()
                 //get all hosts in current browser version
                 .flatMap(region -> region.getHosts().stream())
                 .map(Host::getAddress)

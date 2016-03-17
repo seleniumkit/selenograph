@@ -40,6 +40,27 @@
         </xsd:complexContent>
     </xsd:complexType>
 
+    <xsd:complexType name="SessionRequest" abstract="true">
+        <xsd:complexContent>
+            <xsd:extension base="BrowserContext">
+                <xsd:attribute name="requestId" type="xsd:string" use="required"/>
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="SessionRequestEnqueued">
+        <xsd:complexContent>
+            <xsd:extension base="SessionRequest">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+    <xsd:complexType name="SessionRequestDequeued">
+        <xsd:complexContent>
+            <xsd:extension base="SessionRequest">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
     <xsd:complexType name="StartSessionEvent">
         <xsd:complexContent>
             <xsd:extension base="SessionEvent">

@@ -10,6 +10,7 @@
     <context:component-scan base-package="ru.qatools.gridrouter"/>
     <bean class="${selenograph.gridrouter.hostSelectionStrategy}"/>
     <bean class="${selenograph.gridrouter.statsCounter}"/>
+    <bean class="${selenograph.gridrouter.requestQueueChecker}"/>
 
     <!-- Camelot + Spring -->
     <bean id="camelot-context-injector" class="ru.yandex.qatools.camelot.core.impl.SpringContextInjector"/>
