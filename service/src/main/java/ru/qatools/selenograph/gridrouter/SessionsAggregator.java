@@ -106,7 +106,10 @@ public class SessionsAggregator implements StatsCounter {
     @Override
     public void deleteSession(String sessionId, String route) {
         LOGGER.info("Removing session {} ({})", sessionId, route);
-        input.produce(deleteEvent(findSessionById(sessionId)));
+        final SessionEvent session = findSessionById(sessionId);
+        if (session != null) {
+            input.produce(deleteEvent(session));
+        }
     }
 
     private String toHubHost(String route) {
