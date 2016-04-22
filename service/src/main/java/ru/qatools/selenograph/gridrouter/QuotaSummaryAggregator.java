@@ -36,6 +36,7 @@ import static java.util.UUID.randomUUID;
 import static java.util.stream.Collectors.toList;
 import static ru.qatools.selenograph.front.BrowserSummaryMerge.MERGE_COLLECTOR;
 import static ru.qatools.selenograph.util.Key.browserName;
+import static ru.qatools.selenograph.util.Key.browserVersion;
 
 /**
  * @author Innokenty Shuvalov innokenty@yandex-team.ru
@@ -130,7 +131,7 @@ public class QuotaSummaryAggregator {
                 //transform to version summaries
                 .flatMap(bs -> bs.getVersions().stream())
                 //find the only one version summary that corresponds to the current version
-                .filter(vs -> vs.getVersion().equals(version.getNumber()))
+                .filter(vs -> browserVersion(vs.getVersion()).equals(browserVersion(version.getNumber())))
                 .findFirst();
     }
 
