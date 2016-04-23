@@ -50,11 +50,11 @@
         <plugin id="requestsQueue" source="quotaClientNotifier">
             <aggregator>ru.qatools.selenograph.gridrouter.QueueWaitAvailableBrowsersChecker</aggregator>
         </plugin>
-        <plugin id="quotaStats" source="quotaClientNotifier">
-            <aggregator>ru.qatools.selenograph.gridrouter.QuotaStatsAggregator</aggregator>
-        </plugin>
         <plugin id="quotaSessions" source="quotaClientNotifier">
             <aggregator>ru.qatools.selenograph.gridrouter.SessionsAggregator</aggregator>
+        </plugin>
+        <plugin id="quotaStats" source="quotaSessions">
+            <aggregator>ru.qatools.selenograph.gridrouter.QuotaStatsAggregator</aggregator>
         </plugin>
         <plugin id="graphite" source="graphite">
             <processor>ru.yandex.qatools.camelot.plugin.GraphiteReportProcessor</processor>

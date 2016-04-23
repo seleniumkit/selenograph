@@ -23,7 +23,8 @@
         <compile.version>1.8</compile.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <gridrouter.version>1.29-SNAPSHOT</gridrouter.version>
-        <camelot.version>2.5.2</camelot.version>
+        <camelot.version>2.5.4-20160420</camelot.version>
+        <jackson.version>2.7.3</jackson.version>
     </properties>
 
     <scm>
@@ -58,6 +59,35 @@
                 <artifactId>camelot-web</artifactId>
                 <version>${camelot.version}</version>
                 <type>war</type>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-core</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-annotations</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-databind</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
             </dependency>
             <dependency>
                 <groupId>ru.yandex.qatools.camelot</groupId>

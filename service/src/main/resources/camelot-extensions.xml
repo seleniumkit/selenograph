@@ -8,6 +8,7 @@
 
     <!-- Grid Router -->
     <context:component-scan base-package="ru.qatools.gridrouter"/>
+    <context:component-scan base-package="ru.qatools.selenograph"/>
     <bean class="${selenograph.gridrouter.hostSelectionStrategy}"/>
     <bean class="${selenograph.gridrouter.statsCounter}"/>
     <bean class="${selenograph.gridrouter.requestQueueChecker}"/>
@@ -15,4 +16,22 @@
     <!-- Camelot + Spring -->
     <bean id="camelot-context-injector" class="ru.yandex.qatools.camelot.core.impl.SpringContextInjector"/>
     <bean id="camelot-resource-builder" class="ru.yandex.qatools.camelot.core.builders.SpringPluginResourceBuilder"/>
+
+    <bean id="selenograph-messages-serializer"
+          class="ru.qatools.selenograph.ext.SelenographMessagesSerializer"/>
+    <bean id="selenograph-mongo-serializer-builder"
+          class="ru.qatools.selenograph.ext.SelenographMongoSerializerBuilder"/>
+
+    <bean id="selenograph-mongo-serializer" factory-bean="selenograph-mongo-serializer-builder"
+          factory-method="build">
+        <constructor-arg name="msgSerializer" ref="selenograph-messages-serializer"/>
+        <constructor-arg name="classLoader" value="#{T(ru.qatools.selenograph.ext.SelenographDB).getClass().getClassLoader()}"/>
+    </bean>
+
+    <bean id="selenograph-db-access" class="ru.qatools.selenograph.ext.SelenographDB" init-method="init">
+        <constructor-arg name="mongo" ref="camelot-mongodb-client"/>
+        <constructor-arg name="dbName" value="${camelot.mongodb.dbname}"/>
+        <constructor-arg name="processingEngine" ref="camelot-processing-engine"/>
+        <constructor-arg name="serializer" ref="selenograph-mongo-serializer"/>
+    </bean>
 </beans>

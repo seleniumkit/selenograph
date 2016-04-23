@@ -13,15 +13,14 @@ import javax.inject.Inject;
 import static java.lang.Math.round;
 import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
-import static java.time.ZonedDateTime.now;
 
 /**
  * @author Ilya Sadykov
  */
 @Aggregate
 @FSM(start = SessionsState.class)
-@Filter(custom = SessionEventFilter.class)
-@Transitions(@Transit(on = SessionEvent.class))
+@Filter(instanceOf = SessionsState.class)
+@Transitions(@Transit(on = SessionsState.class))
 public class QuotaStatsAggregator {
     protected static final Logger LOGGER = LoggerFactory.getLogger(QuotaStatsAggregator.class);
     @Inject
@@ -34,54 +33,35 @@ public class QuotaStatsAggregator {
     EventProducer graphite;
 
     @AggregationKey
-    public String aggregationKey(SessionEvent event) {
+    public String aggregationKey(SessionsState event) {
         return event.getUser() + ":" + event.getBrowser() + ":" + event.getVersion();
     }
 
     @BeforeTransit
-    public void beforeCreate(SessionsState state, SessionEvent event) {
+    public void beforeCreate(SessionsState state, SessionsState to, SessionsState event) {
         state.withUser(event.getUser())
                 .withBrowser(event.getBrowser())
-                .withVersion(event.getVersion());
-    }
-
-    @OnTransit
-    public void onStart(SessionsState state, StartSessionEvent event) {
-        state.setRaw(state.getRaw() + 1);
-        LOGGER.debug("Starting session {} for {}:{}:{}, new raw is: {}", event.getSessionId(),
-                state.getUser(), state.getBrowser(), state.getVersion(), state.getRaw());
-    }
-
-    @OnTransit
-    public void onDelete(SessionsState state, DeleteSessionEvent event) {
-        state.setRaw(state.getRaw() - 1);
-        LOGGER.debug("Stopping session {} for {}:{}:{}, new raw is: {}", event.getSessionId(),
-                state.getUser(), state.getBrowser(), state.getVersion(), state.getRaw());
+                .withVersion(event.getVersion())
+                .withRaw(event.getRaw());
     }
 
     @AfterTransit
-    public void updateStats(SessionsState state, SessionEvent event) {
+    public void updateStats(SessionsState state, SessionsState to, SessionsState event) {
         state.setMax(state.getRaw() > state.getMax() ? state.getRaw() : state.getMax());
         state.setAvg(round(((float) state.getAvg() + (float) state.getRaw()) / 2.0f));
-        state.setTimestamp(now());
+        state.setTimestamp(currentTimeMillis());
     }
 
-    @OnTimer(cron = "0 * * * * ?", readOnly = false, skipIfNotCompleted = true)
+    @OnTimer(cron = "0 * * * * ?", skipIfNotCompleted = true)
     public void resetStats(SessionsState state) {
-        LOGGER.info("Resetting stats every minute for {}:{}:{}...",
+        LOGGER.info("Sending stats to graphite for {}:{}:{}...",
                 state.getUser(), state.getBrowser(), state.getVersion());
         final String prefix = format("%s.%s.%s-%s", graphitePrefix, state.getUser(),
                 state.getBrowser().replace(".", "_"),
                 state.getVersion().replace(".", "_"));
         final long timestamp = currentTimeMillis() / 1000L;
-        final int count = (int) sessions.countSessionsByUserAndBrowser(state.getUser(),
-                state.getBrowser(), state.getVersion());
         graphite.produce(new GraphiteValue(prefix + ".stats.raw", state.getRaw(), timestamp));
         graphite.produce(new GraphiteValue(prefix + ".stats.max", state.getMax(), timestamp));
         graphite.produce(new GraphiteValue(prefix + ".stats.avg", state.getAvg(), timestamp));
-        graphite.produce(new GraphiteValue(prefix + ".stats.current", count, timestamp));
-        state.setMax(count);
-        state.setAvg(count);
-        state.setRaw(count);
     }
 }

@@ -10,6 +10,39 @@
     <artifactId>selenograph-service</artifactId>
 
     <dependencies>
+        <!-- Camelot MongoDB & FST -->
+        <dependency>
+            <groupId>ru.yandex.qatools.camelot</groupId>
+            <artifactId>camelot-serialize-fst</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.yandex.qatools.camelot</groupId>
+            <artifactId>camelot-mongodb</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>2.7.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mongojack</groupId>
+            <artifactId>mongojack</artifactId>
+            <version>2.6.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ru.yandex.qatools.embed</groupId>
+            <artifactId>embedded-services</artifactId>
+            <version>1.21</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <artifactId>mongo-java-driver</artifactId>
+                    <groupId>org.mongodb</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+
         <!-- Beans -->
         <dependency>
             <groupId>${project.groupId}</groupId>

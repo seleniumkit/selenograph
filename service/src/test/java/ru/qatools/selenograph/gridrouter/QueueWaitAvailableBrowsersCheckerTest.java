@@ -41,8 +41,8 @@ public class QueueWaitAvailableBrowsersCheckerTest {
     public void testCountEnqueuedRequests() throws Exception {
         final String reqId = randomUUID().toString();
         rangeClosed(0, 2).forEach(i -> queue.onWait("user", "firefox", version("33"), reqId, i));
-        verify(mock, timeout(2000L).times(1)).onBeforeRequest(any(), any());
-        verify(mock, timeout(2000L).times(1)).onEnqueued(any(), any());
+        verify(mock, timeout(4000L).times(1)).onBeforeRequest(any(), any());
+        verify(mock, timeout(4000L).times(1)).onEnqueued(any(), any());
         await().atMost(2, SECONDS).until(() -> state("user-firefox-33"), notNullValue());
 
         assertThat(state("user-firefox-33").size(), equalTo(1));

@@ -117,18 +117,13 @@ public class QuotaSummaryAggregator {
 
     private static Optional<VersionSummary> toVersionSummary(Version version, HubBrowserSummariesMap hubs, String browser) {
         return version.getRegions().parallelStream()
-                //get all hosts in current browser version
                 .flatMap(region -> region.getHosts().stream())
                 .map(Host::getAddress)
-                //transform to browser summaries
                 .flatMap(hubs::get)
-                //retain only corresponding to the current browser
                 .filter(bs -> bs.getName().equals(browser))
-                //merge
                 .map(BrowserSummaryMerge::new)
                 .collect(MERGE_COLLECTOR).values().stream()
                 .map(BrowserSummaryMerge::getBean)
-                //transform to version summaries
                 .flatMap(bs -> bs.getVersions().stream())
                 //find the only one version summary that corresponds to the current version
                 .filter(vs -> browserVersion(vs.getVersion()).equals(browserVersion(version.getNumber())))

@@ -6,26 +6,26 @@ import ru.qatools.gridrouter.sessions.StatsCounter;
 import ru.qatools.selenograph.BrowserInfo;
 import ru.qatools.selenograph.BrowserStarted;
 import ru.qatools.selenograph.SessionReleasing;
+import ru.qatools.selenograph.ext.SelenographDB;
 import ru.qatools.selenograph.plugins.HubBrowserStateAggregator;
 import ru.yandex.qatools.camelot.api.AggregatorRepository;
 import ru.yandex.qatools.camelot.api.EventProducer;
 import ru.yandex.qatools.camelot.api.annotations.*;
+import ru.yandex.qatools.camelot.common.ProcessingEngine;
 import ru.yandex.qatools.fsm.annotations.*;
 
+import javax.inject.Inject;
 import java.time.Duration;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static java.lang.Integer.parseInt;
+import static java.lang.Math.toIntExact;
 import static java.lang.System.currentTimeMillis;
-import static java.time.Duration.between;
-import static java.time.ZonedDateTime.now;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.StringUtils.isNumeric;
 import static ru.qatools.selenograph.util.Key.browserName;
 import static ru.qatools.selenograph.util.Key.browserVersion;
+import static ru.yandex.qatools.camelot.util.DateUtil.isTimePassedSince;
 
 /**
  * @author Ilya Sadykov
@@ -42,32 +42,37 @@ public class SessionsAggregator implements StatsCounter {
     protected static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
     @Input(HubBrowserStateAggregator.class)
     EventProducer browserStates;
-    @Input(QuotaStatsAggregator.class)
-    EventProducer quotaStats;
+    @Inject
+    SelenographDB database;
+    @Inject
+    ProcessingEngine procEngine;
     @Input(SessionsAggregator.class)
     private EventProducer input;
-
+    @Input(QuotaStatsAggregator.class)
+    private EventProducer qutaStats;
     @Repository(SessionsAggregator.class)
     private AggregatorRepository<SessionEvent> repo;
-
     @Repository(QuotaStatsAggregator.class)
-    private AggregatorRepository<SessionsState> quotaStatsRepo;
+    private AggregatorRepository<SessionsState> statsRepo;
 
     @NewState
     public Object newState(Class stateClass, StartSessionEvent event) throws Exception {
-        return event.withTimestamp(now());
+        return event.withTimestamp(currentTimeMillis());
     }
 
     @AggregationKey
     public String aggregationKey(SessionEvent event) {
-        return event.getUser() + ":" + event.getBrowser() + ":" + event.getVersion() + ":" + event.getSessionId();
+        return event.getSessionId();
+    }
+
+    @BeforeTransit
+    public void veforeUpdate(SessionEvent state, SessionEvent event) {
+        LOGGER.debug("on{} session {} for {}:{}:{} ({})", event.getClass(), event.getSessionId(), event.getUser(),
+                event.getBrowser(), event.getVersion(), event.getRoute());
     }
 
     @OnTransit
     public void onStart(UndefinedSessionState state, StartSessionEvent event) {
-        LOGGER.debug("onStart session {} for {}:{}:{} ({})", event.getSessionId(), event.getUser(),
-                event.getBrowser(), event.getVersion(), event.getRoute());
-        quotaStats.produce(event);
         browserStates.produce(new BrowserStarted().withSessionId(event.getSessionId())
                 .withHubHost(toHubHost(event.getRoute()))
                 .withHubPort(toHubPort(event.getRoute()))
@@ -78,15 +83,28 @@ public class SessionsAggregator implements StatsCounter {
 
     @OnTransit
     public void onDelete(StartSessionEvent state, DeleteSessionEvent event) {
-        LOGGER.debug("onDelete session {} for {}:{}:{} ({})", event.getSessionId(), event.getUser(),
-                event.getBrowser(), event.getVersion(), event.getRoute());
-        quotaStats.produce(deleteEvent(state));
         browserStates.produce(new SessionReleasing().withSessionId(event.getSessionId())
                 .withHubHost(toHubHost(state.getRoute())).withHubPort(toHubPort(state.getRoute()))
                 .withTimestamp(currentTimeMillis())
                 .withBrowserInfo(new BrowserInfo().withName(state.getBrowser())
                         .withVersion(state.getVersion()))
         );
+    }
+
+    @AfterTransit
+    public void afterUpdate(SessionEvent state, SessionEvent event) {
+        state.setTimestamp(event.getTimestamp());
+    }
+
+    @OnTimer(cron = "${selenograph.quota.stats.update.cron}", perState = false, skipIfNotCompleted = true)
+    public void updateQuotaStats() {
+        database.sesionsByUserCount().entrySet().forEach(e ->
+                qutaStats.produce(new SessionsState()
+                        .withUser(e.getKey().getUser())
+                        .withBrowser(e.getKey().getBrowser())
+                        .withVersion(e.getKey().getVersion())
+                        .withRaw(toIntExact(e.getValue()))
+                ));
     }
 
     @Override
@@ -106,23 +124,26 @@ public class SessionsAggregator implements StatsCounter {
     @Override
     public void deleteSession(String sessionId, String route) {
         LOGGER.info("Removing session {} ({})", sessionId, route);
-        input.produce(deleteEvent(findSessionById(sessionId)));
+        final SessionEvent session = findSessionById(sessionId);
+        if (session != null) {
+            input.produce(sessionEvent(new DeleteSessionEvent(), session));
+        }
     }
 
-    private String toHubHost(String route) {
-        return route != null ? route.replaceFirst(ROUTE_REGEX, "$1") : "";
-    }
-
-    private int toHubPort(String route) {
-        final String portString = route != null ? route.replaceAll(ROUTE_REGEX, "$2") : "";
-        return isNumeric(portString) ? parseInt(portString) : 0;
+    @Override
+    public void updateSession(String sessionId, String route) {
+        LOGGER.info("Updating session {} ({})", sessionId, route);
+        final SessionEvent session = findSessionById(sessionId);
+        if (session != null) {
+            input.produce(sessionEvent(new UpdateSessionEvent(), session));
+        }
     }
 
     @Override
     public void expireSessionsOlderThan(Duration duration) {
         repo.valuesMap().values().forEach(state -> {
-            if (duration.compareTo(between(state.getTimestamp(), now())) < 0) {
-                input.produce(deleteEvent(state));
+            if (isTimePassedSince(duration.toMillis(), state.getTimestamp())) {
+                input.produce(sessionEvent(new DeleteSessionEvent(), state));
             }
         });
     }
@@ -135,38 +156,41 @@ public class SessionsAggregator implements StatsCounter {
 
     @Override
     public UserSessionsStats getStats(String user) {
-        return new UserSessionsStats(quotaStatsRepo.valuesMap().entrySet().stream()
-                .filter(state -> state.getValue().getUser().equals(user))
-                .map(Map.Entry::getValue)
-                .collect(toList()), repo.valuesMap());
+        final UserSessionsStats res = new UserSessionsStats();
+        res.putAll(statsRepo.valuesMap());
+        return res;
     }
 
     @Override
     public int getSessionsCountForUser(String user) {
-        return (int) countSessionsByUser(user);
+        return (int) database.countSessionsByUser(user);
     }
 
     @Override
     public int getSessionsCountForUserAndBrowser(String user, String browser, String version) {
-        return (int) countSessionsByUserAndBrowser(user, browser, version);
+        return (int) database.countSessionsByUserAndBrowser(user, browser, version);
     }
 
-    public long countSessionsByUser(String user) {
-        return repo.keys().stream().filter(s -> s.startsWith(user + ":")).count();
+    private String toHubHost(String route) {
+        return route != null ? route.replaceFirst(ROUTE_REGEX, "$1") : "";
     }
 
-    public long countSessionsByUserAndBrowser(String user, String browser, String version) {
-        return repo.keys().stream().filter(s -> s.startsWith(user + ":" + browser + ":" + version)).count();
+    private int toHubPort(String route) {
+        final String portString = route != null ? route.replaceAll(ROUTE_REGEX, "$2") : "";
+        return isNumeric(portString) ? parseInt(portString) : 0;
     }
 
-    public SessionEvent findSessionById(String sessionId) {
-        final Optional<Map.Entry<String, SessionEvent>> context = repo.valuesMap()
-                .entrySet().stream().filter(s -> s.getKey().contains(sessionId)).findFirst();
-        return context.isPresent() ? context.get().getValue() : null;
+    Set<SessionEvent> sessionsByUser(String user) {
+        return database.sessionsByUser(user);
     }
 
-    private DeleteSessionEvent deleteEvent(SessionEvent state) {
-        return new DeleteSessionEvent().withUser(state.getUser())
+    private SessionEvent findSessionById(String sessionId) {
+        return database.findSessionById(sessionId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <E extends SessionEvent> E sessionEvent(E event, SessionEvent state) {
+        return (E) event.withUser(state.getUser())
                 .withBrowser(state.getBrowser())
                 .withVersion(state.getVersion())
                 .withRoute(state.getRoute())

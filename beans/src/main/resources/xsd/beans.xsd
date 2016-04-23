@@ -67,6 +67,12 @@
             </xsd:extension>
         </xsd:complexContent>
     </xsd:complexType>
+    <xsd:complexType name="UpdateSessionEvent">
+        <xsd:complexContent>
+            <xsd:extension base="SessionEvent">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
     <xsd:complexType name="DeleteSessionEvent">
         <xsd:complexContent>
             <xsd:extension base="SessionEvent">

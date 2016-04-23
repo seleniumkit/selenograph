@@ -4,38 +4,37 @@ import org.jvnet.jaxb2_commons.lang.*;
 import org.jvnet.jaxb2_commons.locator.ObjectLocator;
 
 import java.io.Serializable;
-import java.time.temporal.Temporal;
 
-import static java.time.ZonedDateTime.now;
+import static java.lang.System.currentTimeMillis;
 
 /**
  * @author Ilya Sadykov
  */
 public class Timestamped<T extends Timestamped> implements Serializable, Equals, HashCode, ToString {
-    private Temporal timestamp = now();
+    private long timestamp = currentTimeMillis();
 
-    public Temporal getTimestamp() {
+    public long getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(Temporal timestamp) {
+    public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
 
     @SuppressWarnings("unchecked")
-    public T withTimestamp(Temporal timestamp) {
+    public T withTimestamp(long timestamp) {
         setTimestamp(timestamp);
         return (T) this;
     }
 
     @Override
     public boolean equals(ObjectLocator thisLocator, ObjectLocator thatLocator, Object that, EqualsStrategy strategy) {
-        return (that instanceof Timestamped && ((Timestamped) that).timestamp.equals(this.timestamp));
+        return (that instanceof Timestamped && ((Timestamped) that).timestamp == this.timestamp);
     }
 
     @Override
     public int hashCode(ObjectLocator thisLocator, HashCodeStrategy strategy) {
-        return timestamp.hashCode();
+        return Long.valueOf(timestamp).hashCode();
     }
 
     @Override

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+            http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+            http://www.springframework.org/schema/util
+            http://www.springframework.org/schema/util/spring-util.xsd
+            http://www.springframework.org/schema/context
+            http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <context:annotation-config/>
+    <context:component-scan base-package="ru.yandex.qatools.camelot.core"/>
+    <bean id="camelot-mongodb-embedded"
+          class="ru.yandex.qatools.embed.service.MongoEmbeddedService"
+          init-method="start" destroy-method="stop">
+        <constructor-arg name="replicaSet" value="${camelot.mongodb.replicaset}"/>
+        <constructor-arg name="mongoUsername" value="${camelot.mongodb.username}"/>
+        <constructor-arg name="mongoPassword" value="${camelot.mongodb.password}"/>
+        <constructor-arg name="mongoDatabaseName" value="${camelot.mongodb.dbname}"/>
+        <constructor-arg name="replSetName" value="camelot"/>
+        <constructor-arg name="dataDirectory" value=""/>
+        <constructor-arg name="enabled" value="true"/>
+        <constructor-arg name="initTimeout" value="10000"/>
+    </bean>
+
+    <bean id="camelot-plugin-initializer" class="ru.yandex.qatools.camelot.mongodb.MongodbPluginInitializer"
+          depends-on="camelot-mongodb-embedded">
+        <constructor-arg name="mongoClient" ref="camelot-mongodb-client"/>
+        <constructor-arg name="dbName" value="${camelot.mongodb.dbname}"/>
+    </bean>
+</beans>
