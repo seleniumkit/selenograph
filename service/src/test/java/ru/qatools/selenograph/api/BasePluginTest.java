@@ -1,4 +1,4 @@
-package ru.qatools.selenograph.plugins;
+package ru.qatools.selenograph.api;
 
 import org.hamcrest.Matcher;
 import org.junit.After;

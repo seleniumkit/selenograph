@@ -1,20 +1,13 @@
-package ru.qatools.selenograph.plugins;
+package ru.qatools.selenograph.api;
 
-import ru.yandex.qatools.camelot.api.AggregatorRepository;
-import ru.yandex.qatools.camelot.api.Constants;
 import ru.yandex.qatools.camelot.api.PluginsInterop;
 import ru.yandex.qatools.camelot.api.annotations.Plugins;
-import ru.yandex.qatools.camelot.api.annotations.Repository;
-import ru.qatools.selenograph.front.HubSummary;
-import ru.qatools.selenograph.states.HubSummariesState;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import java.io.IOException;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
@@ -28,16 +21,6 @@ public class ApiResource {
 
     @Plugins
     PluginsInterop plugins;
-
-    @Repository(HubSummaryAggregator.class)
-    AggregatorRepository<HubSummariesState> hubSummaryRepository;
-
-    @GET
-    @Path("/hubs")
-    @Produces({APPLICATION_JSON})
-    public List<HubSummary> getHubs() throws IOException {
-        return hubSummaryRepository.get(Constants.Keys.ALL).getHubSummaries();
-    }
 
     @GET
     @Path("/count/{pluginId}")

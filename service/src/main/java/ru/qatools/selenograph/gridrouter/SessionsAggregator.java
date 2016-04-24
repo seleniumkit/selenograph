@@ -3,11 +3,7 @@ package ru.qatools.selenograph.gridrouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.qatools.gridrouter.sessions.StatsCounter;
-import ru.qatools.selenograph.BrowserInfo;
-import ru.qatools.selenograph.BrowserStarted;
-import ru.qatools.selenograph.SessionReleasing;
 import ru.qatools.selenograph.ext.SelenographDB;
-import ru.qatools.selenograph.plugins.HubBrowserStateAggregator;
 import ru.yandex.qatools.camelot.api.AggregatorRepository;
 import ru.yandex.qatools.camelot.api.EventProducer;
 import ru.yandex.qatools.camelot.api.annotations.*;
@@ -23,8 +19,8 @@ import static java.lang.Math.toIntExact;
 import static java.lang.System.currentTimeMillis;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.StringUtils.isNumeric;
-import static ru.qatools.selenograph.util.Key.browserName;
-import static ru.qatools.selenograph.util.Key.browserVersion;
+import static ru.qatools.selenograph.gridrouter.Key.browserName;
+import static ru.qatools.selenograph.gridrouter.Key.browserVersion;
 import static ru.yandex.qatools.camelot.util.DateUtil.isTimePassedSince;
 
 /**
@@ -38,10 +34,8 @@ import static ru.yandex.qatools.camelot.util.DateUtil.isTimePassedSince;
         @Transit(on = DeleteSessionEvent.class, stop = true)
 })
 public class SessionsAggregator implements StatsCounter {
-    public static final String ROUTE_REGEX = "http://([^:]+):(\\d+)";
-    protected static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
-    @Input(HubBrowserStateAggregator.class)
-    EventProducer browserStates;
+    static final String ROUTE_REGEX = "http://([^:]+):(\\d+)";
+    private static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
     @Inject
     SelenographDB database;
     @Inject
@@ -67,38 +61,14 @@ public class SessionsAggregator implements StatsCounter {
 
     @BeforeTransit
     public void veforeUpdate(SessionEvent state, SessionEvent event) {
-        LOGGER.debug("on{} session {} for {}:{}:{} ({})", event.getClass(), event.getSessionId(), event.getUser(),
-                event.getBrowser(), event.getVersion(), event.getRoute());
-    }
-
-    @OnTransit
-    public void onStart(UndefinedSessionState state, StartSessionEvent event) {
-        browserStates.produce(new BrowserStarted().withSessionId(event.getSessionId())
-                .withHubHost(toHubHost(event.getRoute()))
-                .withHubPort(toHubPort(event.getRoute()))
-                .withTimestamp(currentTimeMillis())
-                .withBrowserInfo(new BrowserInfo().withName(event.getBrowser()).withVersion(event.getVersion()))
-        );
-    }
-
-    @OnTransit
-    public void onDelete(StartSessionEvent state, DeleteSessionEvent event) {
-        browserStates.produce(new SessionReleasing().withSessionId(event.getSessionId())
-                .withHubHost(toHubHost(state.getRoute())).withHubPort(toHubPort(state.getRoute()))
-                .withTimestamp(currentTimeMillis())
-                .withBrowserInfo(new BrowserInfo().withName(state.getBrowser())
-                        .withVersion(state.getVersion()))
-        );
-    }
-
-    @AfterTransit
-    public void afterUpdate(SessionEvent state, SessionEvent event) {
+        LOGGER.debug("on{} session {} for {}:{}:{} ({})", event.getClass().getSimpleName(),
+                event.getSessionId(), event.getUser(), event.getBrowser(), event.getVersion(), event.getRoute());
         state.setTimestamp(event.getTimestamp());
     }
 
     @OnTimer(cron = "${selenograph.quota.stats.update.cron}", perState = false, skipIfNotCompleted = true)
     public void updateQuotaStats() {
-        database.sesionsByUserCount().entrySet().forEach(e ->
+        database.sessionsByUserCount().entrySet().forEach(e ->
                 qutaStats.produce(new SessionsState()
                         .withUser(e.getKey().getUser())
                         .withBrowser(e.getKey().getBrowser())
@@ -112,12 +82,13 @@ public class SessionsAggregator implements StatsCounter {
         final String name = browserName(browser);
         final String ver = browserVersion(version);
         LOGGER.info("Starting session {} for {}:{}:{} ({})", sessionId, user, name, ver, route);
-        final StartSessionEvent startEvent = new StartSessionEvent()
+        final StartSessionEvent startEvent = (StartSessionEvent) new StartSessionEvent()
                 .withSessionId(sessionId)
                 .withRoute(route)
                 .withUser(user)
                 .withBrowser(name)
-                .withVersion(ver);
+                .withVersion(ver)
+                .withTimestamp(currentTimeMillis());
         input.produce(startEvent);
     }
 
@@ -194,6 +165,7 @@ public class SessionsAggregator implements StatsCounter {
                 .withBrowser(state.getBrowser())
                 .withVersion(state.getVersion())
                 .withRoute(state.getRoute())
-                .withSessionId(state.getSessionId());
+                .withSessionId(state.getSessionId())
+                .withTimestamp(currentTimeMillis());
     }
 }

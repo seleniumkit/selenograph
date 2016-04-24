@@ -1,4 +1,4 @@
-package ru.qatools.selenograph.plugins;
+package ru.qatools.selenograph.api;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.component.seda.QueueReference;

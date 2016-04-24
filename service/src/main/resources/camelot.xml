@@ -10,40 +10,12 @@
             <resource>ru.qatools.selenograph.gridrouter.ApiResource</resource>
         </plugin>
         <plugin>
-            <resource>ru.qatools.selenograph.plugins.InputResource</resource>
+            <resource>ru.qatools.selenograph.api.InputResource</resource>
         </plugin>
         <plugin>
-            <resource>ru.qatools.selenograph.plugins.ApiResource</resource>
+            <resource>ru.qatools.selenograph.api.ApiResource</resource>
         </plugin>
-        <plugin id="HubBrowserState">
-            <broker>
-                <param name="concurrentConsumers" value="150"/>
-            </broker>
-            <aggregator>ru.qatools.selenograph.plugins.HubBrowserStateAggregator</aggregator>
-        </plugin>
-        <plugin id="hubs">
-            <broker>
-                <param name="concurrentConsumers" value="200"/>
-                <param name="size" value="2000"/>
-            </broker>
-            <aggregator>ru.qatools.selenograph.plugins.HubStateAggregator</aggregator>
-        </plugin>
-        <plugin id="hubSummary" source="ru.qatools.selenograph.plugins.HubStateAggregator"
-                brokerConfig="?concurrentConsumers=1">
-            <aggregator>ru.qatools.selenograph.plugins.HubSummaryAggregator</aggregator>
-        </plugin>
-        <plugin id="hubsClientNotifier" source="ru.qatools.selenograph.plugins.HubSummaryAggregator"
-                brokerConfig="?concurrentConsumers=1">
-            <processor>ru.qatools.selenograph.plugins.HubSummaryClientNotifier</processor>
-        </plugin>
-        <plugin id="HubSummaryInject" source="ru.qatools.selenograph.plugins.HubSummaryAggregator">
-            <processor>ru.qatools.selenograph.gridrouter.HubSummaryInjectProcessor</processor>
-        </plugin>
-        <plugin id="quotaSummary" source="ru.qatools.selenograph.plugins.HubSummaryAggregator"
-                brokerConfig="?concurrentConsumers=1">
-            <aggregator>ru.qatools.selenograph.gridrouter.QuotaSummaryAggregator</aggregator>
-        </plugin>
-        <plugin id="quotaClientNotifier" source="ru.qatools.selenograph.gridrouter.QuotaSummaryAggregator"
+        <plugin id="quotaClientNotifier" source="quotaStats"
                 brokerConfig="?concurrentConsumers=1">
             <processor>ru.qatools.selenograph.gridrouter.QuotaSummaryClientNotifier</processor>
         </plugin>

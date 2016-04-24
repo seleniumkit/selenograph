@@ -1,12 +1,10 @@
 package ru.qatools.selenograph.gridrouter;
 
-import org.apache.camel.component.mock.MockEndpoint;
 import org.hamcrest.Matcher;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import ru.qatools.selenograph.plugins.HubBrowserStateAggregator;
 import ru.yandex.qatools.camelot.plugin.GraphiteReportProcessor;
 import ru.yandex.qatools.camelot.plugin.GraphiteValue;
 import ru.yandex.qatools.camelot.test.*;
@@ -39,9 +37,6 @@ public class QuotaStatsAggregatorTest {
     @Autowired
     SessionsAggregator sessions;
 
-    @AggregatorState(QuotaStatsAggregator.class)
-    AggregatorStateStorage statsStorage;
-
     @AggregatorState(SessionsAggregator.class)
     AggregatorStateStorage sessionsStorage;
 
@@ -51,20 +46,12 @@ public class QuotaStatsAggregatorTest {
     @PluginMock
     GraphiteReportProcessor graphite;
 
-    @PluginMock
-    SessionsAggregator sessionsMock;
-
-    @EndpointPluginInput(HubBrowserStateAggregator.class)
-    MockEndpoint nodeBrowserState;
-
     @Test
     public void testStartMultipleSessions() throws Exception {
         // Launch 3 sessions
-        expectNodeBrowserStateReceived(3);
         String sessionId1 = startSessionFor("vasya");
         String sessionId2 = startSessionFor("vasya");
         String sessionId3 = startSessionFor("vasya");
-        verifyNodeBrowserStateReceived();
         assertSessionStateFor("vasya", sessionId1, notNullValue());
         assertSessionStateFor("vasya", sessionId2, notNullValue());
         assertSessionStateFor("vasya", sessionId3, notNullValue());
@@ -82,10 +69,8 @@ public class QuotaStatsAggregatorTest {
         assertThat(vasyaStats.getRaw(), is(3));
 
         // Stop two sessions
-        expectNodeBrowserStateReceived(2);
         stopSessionFor("vasya", sessionId1);
         stopSessionFor("vasya", sessionId2);
-        verifyNodeBrowserStateReceived();
         await().atMost(2, SECONDS).until(() -> activeSessionsFor("vasya"),
                 allOf(not(hasItem(sessionId1)), not(hasItem(sessionId2))));
         assertThat(sessions.getSessionsCountForUser("vasya"), is(1));
@@ -98,9 +83,7 @@ public class QuotaStatsAggregatorTest {
         assertThat(statsFor("vasya").getRaw(), is(1));
 
         // Start one more session
-        expectNodeBrowserStateReceived(1);
         String sessionId4 = startSessionFor("vasya");
-        verifyNodeBrowserStateReceived();
         assertSessionStateFor("vasya", sessionId4, notNullValue());
         await().atMost(2, SECONDS).until(() -> activeSessionsFor("vasya"), hasItem(sessionId4));
         assertThat(sessions.getSessionsCountForUser("vasya"), is(2));
@@ -114,9 +97,7 @@ public class QuotaStatsAggregatorTest {
         assertThat(statsFor("vasya").getRaw(), is(2));
 
         // Start one more session
-        expectNodeBrowserStateReceived(1);
         String sessionId5 = startSessionFor("petya");
-        verifyNodeBrowserStateReceived();
         assertSessionStateFor("petya", sessionId5, notNullValue());
         await().atMost(2, SECONDS).until(() -> activeSessionsFor("petya"), hasItem(sessionId5));
         assertThat(sessions.getSessionsCountForUser("petya"), is(1));
@@ -133,7 +114,7 @@ public class QuotaStatsAggregatorTest {
         verify(graphite, timeout(TIMEOUT).times(6)).process(Mockito.any(GraphiteValue.class));
     }
 
-    private SessionsState statsFor(String user) {
+    protected SessionsState statsFor(String user) {
         return sessions.getStats(user).get(keyFor(user));
     }
 
@@ -143,40 +124,35 @@ public class QuotaStatsAggregatorTest {
         reset(quotaStatsMock);
     }
 
-    private void verifyNodeBrowserStateReceived() throws InterruptedException {
-        nodeBrowserState.assertIsSatisfied();
-    }
-
-    private void expectNodeBrowserStateReceived(int count) {
-        nodeBrowserState.reset();
-        nodeBrowserState.expectedMessageCount(count);
-    }
-
-    private void assertStatsStateFor(String user, Matcher<Object> matcher) {
+    protected void assertStatsStateFor(String user, Matcher<Object> matcher) {
         assertThat(sessionsStorage.get(SessionEvent.class, keyFor(user)),
                 should(matcher).whileWaitingUntil(timeoutHasExpired(TIMEOUT)));
     }
 
-    private void assertSessionStateFor(String user, String sessionId, Matcher<Object> matcher) {
+    protected void assertSessionStateFor(String user, String sessionId, Matcher<Object> matcher) {
         assertThat(sessionsStorage.get(SessionEvent.class, keyFor(user) + ":" + sessionId),
                 should(matcher).whileWaitingUntil(timeoutHasExpired(TIMEOUT)));
     }
 
-    private Set<String> activeSessionsFor(String user) {
+    protected Set<String> activeSessionsFor(String user) {
         return sessions.sessionsByUser(user).stream().map(SessionEvent::getSessionId).collect(toSet());
     }
 
-    private String keyFor(String user) {
+    protected String keyFor(String user) {
         return user + ":firefox:33.0";
     }
 
-    private void stopSessionFor(String user, String sessionId) {
+    protected void stopSessionFor(String user, String sessionId) {
         sessions.deleteSession(sessionId);
     }
 
-    private String startSessionFor(String user) {
+    protected String startSessionFor(String user) {
+        return startSessionFor(user, "firefox", "33.0");
+    }
+
+    protected String startSessionFor(String user, String browser, String version) {
         final String sessionId = UUID.randomUUID().toString();
-        sessions.startSession(sessionId, user, "firefox", "33.0");
+        sessions.startSession(sessionId, user, browser, version);
         return sessionId;
     }
 }

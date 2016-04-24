@@ -18,6 +18,7 @@
         <xsd:attribute name="browser" type="xsd:string" use="optional"/>
         <xsd:attribute name="version" type="xsd:string" use="optional"/>
         <xsd:attribute name="user" type="xsd:string" use="optional"/>
+        <xsd:attribute name="route" type="xsd:string" use="optional"/>
     </xsd:complexType>
 
     <xsd:complexType name="SessionsState">
@@ -35,7 +36,6 @@
         <xsd:complexContent>
             <xsd:extension base="BrowserContext">
                 <xsd:attribute name="sessionId" type="xsd:string" use="required"/>
-                <xsd:attribute name="route" type="xsd:string" use="required"/>
             </xsd:extension>
         </xsd:complexContent>
     </xsd:complexType>

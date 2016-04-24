@@ -8,25 +8,26 @@ import org.apache.camel.impl.DefaultExchangeHolder;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.qatools.selenograph.gridrouter.BrowserContext;
-import ru.qatools.selenograph.gridrouter.SessionEvent;
-import ru.qatools.selenograph.gridrouter.SessionsAggregator;
-import ru.qatools.selenograph.gridrouter.UserBrowser;
+import ru.qatools.gridrouter.ConfigRepository;
+import ru.qatools.gridrouter.config.Browsers;
+import ru.qatools.selenograph.gridrouter.*;
 import ru.yandex.qatools.camelot.common.ProcessingEngine;
 import ru.yandex.qatools.camelot.mongodb.MongoSerializer;
 
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import javax.inject.Inject;
+import java.util.*;
 import java.util.function.Consumer;
 
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.sort;
 import static org.apache.camel.impl.DefaultExchangeHolder.unmarshal;
 import static ru.qatools.mongodb.MongoPessimisticRepo.COLL_SUFFIX;
+import static ru.qatools.selenograph.gridrouter.Key.browserName;
+import static ru.qatools.selenograph.gridrouter.Key.browserVersion;
 import static ru.yandex.qatools.camelot.util.MapUtil.map;
 
 /**
@@ -35,11 +36,14 @@ import static ru.yandex.qatools.camelot.util.MapUtil.map;
  */
 @SuppressWarnings("unchecked")
 public class SelenographDB {
+    public static final String ALL = "all";
     private static final Logger LOGGER = LoggerFactory.getLogger(SelenographDB.class);
     private final MongoClient mongo;
     private final String dbName;
     private final ProcessingEngine engine;
     private final MongoSerializer serializer;
+    @Inject
+    private ConfigRepository config;
     private String sessionsPluginId;
 
     public SelenographDB(MongoClient mongo, String dbName,
@@ -52,7 +56,7 @@ public class SelenographDB {
         this.serializer = serializer;
     }
 
-    public void init(){
+    public void init() {
         sessions().createIndex(new Document(map(
                 "object.inBody.user", 1,
                 "object.inBody.browser", 1,
@@ -63,13 +67,72 @@ public class SelenographDB {
         )));
     }
 
+    private static Map<String, Map<BrowserContext, Integer>> quotaCounts(Map<String, Browsers> quotaMap) {
+        Map<String, Map<BrowserContext, Integer>> res = new LinkedHashMap<>();
+        quotaMap.entrySet().forEach(e -> {
+            final String quota = e.getKey();
+            res.putIfAbsent(ALL, new LinkedHashMap<>());
+            res.putIfAbsent(quota, new LinkedHashMap<>());
+            e.getValue().getBrowsers().forEach(b ->
+                    b.getVersions().forEach(v -> {
+                        final BrowserContext key = new UserBrowser()
+                                .withBrowser(browserName(b.getName()))
+                                .withVersion(browserVersion(v.getNumber()))
+                                .withTimestamp(0);
+                        res.get(ALL).putIfAbsent(key, 0);
+                        res.get(ALL).put(key, res.get(ALL).get(key) + v.getCount());
+                        res.get(quota).putIfAbsent(key, 0);
+                        res.get(quota).put(key, res.get(quota).get(key) + v.getCount());
+                    }));
+        });
+        return res;
+    }
+
+    private static Map<String, Map<BrowserContext, Integer>> runningCounts(Map<BrowserContext, Integer> counts) {
+        Map<String, Map<BrowserContext, Integer>> res = new LinkedHashMap<>();
+        counts.entrySet().forEach(e -> {
+            final BrowserContext context = e.getKey();
+            final String quota = context.getUser();
+            final BrowserContext key = new UserBrowser()
+                    .withBrowser(browserName(context.getBrowser()))
+                    .withVersion(browserVersion(context.getVersion()))
+                    .withTimestamp(0);
+            res.putIfAbsent(ALL, new HashMap<>());
+            res.putIfAbsent(quota, new HashMap<>());
+            res.get(ALL).putIfAbsent(key, 0);
+            res.get(quota).putIfAbsent(key, 0);
+            res.get(ALL).put(key, res.get(ALL).get(key) + e.getValue());
+            res.get(quota).put(key, res.get(quota).get(key) + e.getValue());
+        });
+        return res;
+    }
+
+    public Map<String, BrowserSummaries> getQuotasSummary() {
+        final Map<String, Map<BrowserContext, Integer>> running = runningCounts(sessionsByUserCount());
+        final Map<String, Browsers> quotaMap = config.getQuotaMap();
+        final List<String> quotas = new ArrayList<>();
+        quotas.add(ALL);
+        quotas.addAll(quotaMap.keySet());
+        sort(quotas);
+        final Map<String, Map<BrowserContext, Integer>> available = quotaCounts(quotaMap);
+        final Map<String, BrowserSummaries> state = new LinkedHashMap<>();
+        quotas.forEach(quota -> {
+            state.putIfAbsent(quota, new BrowserSummaries());
+            state.get(quota).addOrIncrement(
+                    available.getOrDefault(quota, emptyMap()),
+                    running.getOrDefault(quota, emptyMap())
+            );
+        });
+        return state;
+    }
+
     public Set<String> activeUsers() {
         Set<String> users = new LinkedHashSet<>();
         sessions().distinct("inBody.user", String.class).forEach((Consumer<String>) users::add);
         return users;
     }
 
-    public Map<BrowserContext, Integer> sesionsByUserCount() {
+    public Map<BrowserContext, Integer> sessionsByUserCount() {
         Map<BrowserContext, Integer> results = new HashMap<>();
         /**
          {$project: {inBody: 1}},
@@ -146,7 +209,6 @@ public class SelenographDB {
                 sessions().find(eq("_id", sessionId)).first(), SessionEvent.class
         );
     }
-
 
     private <T> T convertDocument(Document document, Class<T> clazz) {
         try {
