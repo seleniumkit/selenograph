@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static ru.qatools.selenograph.ext.SelenographDB.ALL;
 
 /**
  * @author Ilya Sadykov
@@ -45,6 +46,17 @@ public class QuotaSummaryClientNotifierTest extends QuotaStatsAggregatorTest {
         final ArgumentCaptor<Map> argument = ArgumentCaptor.forClass(Map.class);
         verify(frontend, timeout(1000)).send(argument.capture());
         final Map<String, BrowserSummaries> sent = argument.getValue();
+
+        assertThat(sent.get(ALL), hasSize(2));
+        final BrowserSummary allFirefox = sent.get(ALL).stream()
+                .filter(s -> s.getName().equals("firefox")).findFirst().orElseThrow(RuntimeException::new);
+        assertEquals(4, allFirefox.getMax());
+        assertEquals(2, allFirefox.getRunning());
+        assertThat(allFirefox.getVersions(), hasSize(2));
+        final VersionSummary allFirefox32 = allFirefox.getVersions().stream()
+                .filter(v -> v.getVersion().equals("32.0")).findFirst().orElseThrow(RuntimeException::new);
+        assertEquals(3, allFirefox32.getMax());
+        assertEquals(1, allFirefox32.getRunning());
 
         assertThat(sent.get("user1"), hasSize(1));
         assertEquals(2, sent.get("user1").get(0).getMax());

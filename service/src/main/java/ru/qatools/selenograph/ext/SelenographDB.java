@@ -5,6 +5,7 @@ import com.mongodb.client.MongoCollection;
 import org.apache.camel.Exchange;
 import org.apache.camel.impl.DefaultExchange;
 import org.apache.camel.impl.DefaultExchangeHolder;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,10 @@ import static java.lang.String.format;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.sort;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.summingInt;
 import static org.apache.camel.impl.DefaultExchangeHolder.unmarshal;
+import static org.apache.commons.lang3.tuple.Pair.of;
 import static ru.qatools.mongodb.MongoPessimisticRepo.COLL_SUFFIX;
 import static ru.qatools.selenograph.gridrouter.Key.browserName;
 import static ru.qatools.selenograph.gridrouter.Key.browserVersion;
@@ -32,7 +36,7 @@ import static ru.yandex.qatools.camelot.util.MapUtil.map;
 
 /**
  * @author Ilya Sadykov
- * WARN: MongoDB extension direct dependency!
+ *         WARN: MongoDB extension direct dependency!
  */
 @SuppressWarnings("unchecked")
 public class SelenographDB {
@@ -56,22 +60,11 @@ public class SelenographDB {
         this.serializer = serializer;
     }
 
-    public void init() {
-        sessions().createIndex(new Document(map(
-                "object.inBody.user", 1,
-                "object.inBody.browser", 1,
-                "object.inBody.version", 1
-        )));
-        sessions().createIndex(new Document(map(
-                "object.inBody.user", 1
-        )));
-    }
-
     private static Map<String, Map<BrowserContext, Integer>> quotaCounts(Map<String, Browsers> quotaMap) {
         Map<String, Map<BrowserContext, Integer>> res = new LinkedHashMap<>();
+        Map<Pair<BrowserContext, String>, Integer> hubMax = new HashMap<>();
         quotaMap.entrySet().forEach(e -> {
             final String quota = e.getKey();
-            res.putIfAbsent(ALL, new LinkedHashMap<>());
             res.putIfAbsent(quota, new LinkedHashMap<>());
             e.getValue().getBrowsers().forEach(b ->
                     b.getVersions().forEach(v -> {
@@ -79,12 +72,21 @@ public class SelenographDB {
                                 .withBrowser(browserName(b.getName()))
                                 .withVersion(browserVersion(v.getNumber()))
                                 .withTimestamp(0);
-                        res.get(ALL).putIfAbsent(key, 0);
-                        res.get(ALL).put(key, res.get(ALL).get(key) + v.getCount());
+                        v.getRegions().parallelStream()
+                                .flatMap(r -> r.getHosts().parallelStream())
+                                .forEach(h -> {
+                                    final Pair<BrowserContext, String> pair = of(key, h.getAddress());
+                                    if (!hubMax.containsKey(pair) || hubMax.get(pair) < h.getCount()) {
+                                        hubMax.put(pair, h.getCount());
+                                    }
+                                });
                         res.get(quota).putIfAbsent(key, 0);
                         res.get(quota).put(key, res.get(quota).get(key) + v.getCount());
                     }));
         });
+        res.put(ALL, new HashMap<>());
+        hubMax.entrySet().parallelStream().collect(groupingBy(e -> e.getKey().getKey(), summingInt(Map.Entry::getValue)))
+                .entrySet().forEach(e -> res.get(ALL).putIfAbsent(e.getKey(), e.getValue()));
         return res;
     }
 
@@ -107,6 +109,17 @@ public class SelenographDB {
         return res;
     }
 
+    public void init() {
+        sessions().createIndex(new Document(map(
+                "object.inBody.user", 1,
+                "object.inBody.browser", 1,
+                "object.inBody.version", 1
+        )));
+        sessions().createIndex(new Document(map(
+                "object.inBody.user", 1
+        )));
+    }
+
     public Map<String, BrowserSummaries> getQuotasSummary() {
         final Map<String, Map<BrowserContext, Integer>> running = runningCounts(sessionsByUserCount());
         final Map<String, Browsers> quotaMap = config.getQuotaMap();
@@ -124,12 +137,6 @@ public class SelenographDB {
             );
         });
         return state;
-    }
-
-    public Set<String> activeUsers() {
-        Set<String> users = new LinkedHashSet<>();
-        sessions().distinct("inBody.user", String.class).forEach((Consumer<String>) users::add);
-        return users;
     }
 
     public Map<BrowserContext, Integer> sessionsByUserCount() {
