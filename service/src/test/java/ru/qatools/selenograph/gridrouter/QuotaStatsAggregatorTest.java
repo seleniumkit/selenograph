@@ -15,10 +15,12 @@ import java.util.UUID;
 import static com.jayway.awaitility.Awaitility.await;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toSet;
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.*;
 import static ru.yandex.qatools.matchers.decorators.MatcherDecorators.should;
 import static ru.yandex.qatools.matchers.decorators.TimeoutWaiter.timeoutHasExpired;
@@ -41,10 +43,24 @@ public class QuotaStatsAggregatorTest {
     AggregatorStateStorage sessionsStorage;
 
     @PluginMock
+    SessionsAggregator sessionsMock;
+
+    @PluginMock
     QuotaStatsAggregator quotaStatsMock;
 
     @PluginMock
     GraphiteReportProcessor graphite;
+
+    @Test
+    public void testUpdateAfterRemoved() throws Exception {
+        helper.sendTo(SessionsAggregator.class, new UpdateSessionEvent()
+                .withSessionId("sessionId").withBrowser("browser").withVersion("version").withUser("user"));
+        verify(sessionsMock, timeout(2000)).beforeUpdate(any(), argThat(
+                hasProperty("sessionId", equalTo("sessionId"))
+        ));
+        await().atMost(4, SECONDS).until(() -> sessions.getActiveSessions(), not(hasItems("sessionId")));
+        sessions.deleteSession("sessionId");
+    }
 
     @Test
     public void testStartMultipleSessions() throws Exception {
@@ -55,6 +71,10 @@ public class QuotaStatsAggregatorTest {
         assertSessionStateFor("vasya", sessionId1, notNullValue());
         assertSessionStateFor("vasya", sessionId2, notNullValue());
         assertSessionStateFor("vasya", sessionId3, notNullValue());
+
+        sessions.updateSession(sessionId1);
+        sessions.updateSession(sessionId2);
+        sessions.updateSession(sessionId3);
 
         await().atMost(4, SECONDS).until(() -> activeSessionsFor("vasya"),
                 hasItems(sessionId1, sessionId2, sessionId3));

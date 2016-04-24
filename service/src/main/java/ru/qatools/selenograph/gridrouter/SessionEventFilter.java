@@ -12,6 +12,7 @@ public class SessionEventFilter implements CustomFilter {
     public boolean filter(Object body) {
         return body != null && body instanceof SessionEvent
                 && !isEmpty(((SessionEvent) body).getSessionId())
+                && !isEmpty(((SessionEvent) body).getUser())
                 && !isEmpty(((SessionEvent) body).getBrowser())
                 && !isEmpty(((SessionEvent) body).getVersion());
     }

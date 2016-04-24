@@ -8,15 +8,18 @@ import ru.yandex.qatools.camelot.api.AggregatorRepository;
 import ru.yandex.qatools.camelot.api.EventProducer;
 import ru.yandex.qatools.camelot.api.annotations.*;
 import ru.yandex.qatools.camelot.common.ProcessingEngine;
+import ru.yandex.qatools.fsm.StopConditionAware;
 import ru.yandex.qatools.fsm.annotations.*;
 
 import javax.inject.Inject;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
 
 import static java.lang.Integer.parseInt;
 import static java.lang.Math.toIntExact;
 import static java.lang.System.currentTimeMillis;
+import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.StringUtils.isNumeric;
 import static ru.qatools.selenograph.gridrouter.Key.browserName;
@@ -30,10 +33,10 @@ import static ru.yandex.qatools.camelot.util.DateUtil.isTimePassedSince;
 @Filter(custom = SessionEventFilter.class)
 @FSM(start = UndefinedSessionState.class)
 @Transitions({
-        @Transit(to = StartSessionEvent.class, on = StartSessionEvent.class),
+        @Transit(to = StartSessionEvent.class, on = SessionEvent.class),
         @Transit(on = DeleteSessionEvent.class, stop = true)
 })
-public class SessionsAggregator implements StatsCounter {
+public class SessionsAggregator implements StatsCounter, StopConditionAware<SessionEvent, SessionEvent> {
     static final String ROUTE_REGEX = "http://([^:]+):(\\d+)";
     private static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
     @Inject
@@ -50,7 +53,7 @@ public class SessionsAggregator implements StatsCounter {
     private AggregatorRepository<SessionsState> statsRepo;
 
     @NewState
-    public Object newState(Class stateClass, StartSessionEvent event) throws Exception {
+    public Object newState(Class stateClass, SessionEvent event) throws Exception {
         return event.withTimestamp(currentTimeMillis());
     }
 
@@ -60,7 +63,7 @@ public class SessionsAggregator implements StatsCounter {
     }
 
     @BeforeTransit
-    public void veforeUpdate(SessionEvent state, SessionEvent event) {
+    public void beforeUpdate(SessionEvent state, SessionEvent event) {
         LOGGER.debug("on{} session {} for {}:{}:{} ({})", event.getClass().getSimpleName(),
                 event.getSessionId(), event.getUser(), event.getBrowser(), event.getVersion(), event.getRoute());
         state.setTimestamp(event.getTimestamp());
@@ -95,19 +98,13 @@ public class SessionsAggregator implements StatsCounter {
     @Override
     public void deleteSession(String sessionId, String route) {
         LOGGER.info("Removing session {} ({})", sessionId, route);
-        final SessionEvent session = findSessionById(sessionId);
-        if (session != null) {
-            input.produce(sessionEvent(new DeleteSessionEvent(), session));
-        }
+        findSessionById(sessionId).ifPresent(s -> input.produce(sessionEvent(new DeleteSessionEvent(), s)));
     }
 
     @Override
     public void updateSession(String sessionId, String route) {
         LOGGER.info("Updating session {} ({})", sessionId, route);
-        final SessionEvent session = findSessionById(sessionId);
-        if (session != null) {
-            input.produce(sessionEvent(new UpdateSessionEvent(), session));
-        }
+        findSessionById(sessionId).ifPresent(s -> input.produce(sessionEvent(new UpdateSessionEvent(), s)));
     }
 
     @Override
@@ -155,8 +152,8 @@ public class SessionsAggregator implements StatsCounter {
         return database.sessionsByUser(user);
     }
 
-    private SessionEvent findSessionById(String sessionId) {
-        return database.findSessionById(sessionId);
+    private Optional<SessionEvent> findSessionById(String sessionId) {
+        return ofNullable(database.findSessionById(sessionId));
     }
 
     @SuppressWarnings("unchecked")
@@ -167,5 +164,14 @@ public class SessionsAggregator implements StatsCounter {
                 .withRoute(state.getRoute())
                 .withSessionId(state.getSessionId())
                 .withTimestamp(currentTimeMillis());
+    }
+
+    @Override
+    public boolean isStopRequired(SessionEvent state, SessionEvent event) {
+        return !(state instanceof StartSessionEvent)
+                || state.getBrowser() == null
+                || state.getVersion() == null
+                || state.getUser() == null
+                || state.getSessionId() == null;
     }
 }
