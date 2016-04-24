@@ -131,7 +131,14 @@ public class QuotaStatsAggregatorTest {
         assertThat(statsFor("petya").getRaw(), is(1));
 
         helper.invokeTimersFor(QuotaStatsAggregator.class);
+        assertThat(statsFor("petya").getMax(), is(1));
+        assertThat(statsFor("petya").getAvg(), is(1));
+        assertThat(statsFor("petya").getRaw(), is(1));
+        assertThat(statsFor("vasya").getMax(), is(2));
+        assertThat(statsFor("vasya").getAvg(), is(2));
+        assertThat(statsFor("vasya").getRaw(), is(2));
         verify(graphite, timeout(TIMEOUT).times(6)).process(Mockito.any(GraphiteValue.class));
+
     }
 
     protected SessionsState statsFor(String user) {

@@ -52,7 +52,7 @@ public class QuotaStatsAggregator {
         state.setTimestamp(currentTimeMillis());
     }
 
-    @OnTimer(cron = "0 * * * * ?", skipIfNotCompleted = true)
+    @OnTimer(cron = "0 * * * * ?", readOnly = false, skipIfNotCompleted = true)
     public void resetStats(SessionsState state) {
         LOGGER.info("Sending stats to graphite for {}:{}:{}...",
                 state.getUser(), state.getBrowser(), state.getVersion());
@@ -63,5 +63,11 @@ public class QuotaStatsAggregator {
         graphite.produce(new GraphiteValue(prefix + ".stats.raw", state.getRaw(), timestamp));
         graphite.produce(new GraphiteValue(prefix + ".stats.max", state.getMax(), timestamp));
         graphite.produce(new GraphiteValue(prefix + ".stats.avg", state.getAvg(), timestamp));
+        final int current = sessions.getSessionsCountForUserAndBrowser(
+                state.getUser(), state.getBrowser(), state.getVersion()
+        );
+        state.setMax(current);
+        state.setAvg(current);
+        state.setRaw(current);
     }
 }
