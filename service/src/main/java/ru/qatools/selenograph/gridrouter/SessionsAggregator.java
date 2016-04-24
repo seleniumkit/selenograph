@@ -16,15 +16,11 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 
-import static java.lang.Integer.parseInt;
 import static java.lang.Math.toIntExact;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.toSet;
-import static org.apache.commons.lang3.StringUtils.isNumeric;
 import static ru.qatools.selenograph.gridrouter.Key.browserName;
 import static ru.qatools.selenograph.gridrouter.Key.browserVersion;
-import static ru.yandex.qatools.camelot.util.DateUtil.isTimePassedSince;
 
 /**
  * @author Ilya Sadykov
@@ -47,8 +43,6 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
     private EventProducer input;
     @Input(QuotaStatsAggregator.class)
     private EventProducer qutaStats;
-    @Repository(SessionsAggregator.class)
-    private AggregatorRepository<SessionEvent> repo;
     @Repository(QuotaStatsAggregator.class)
     private AggregatorRepository<SessionsState> statsRepo;
 
@@ -109,17 +103,12 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
 
     @Override
     public void expireSessionsOlderThan(Duration duration) {
-        repo.valuesMap().values().forEach(state -> {
-            if (isTimePassedSince(duration.toMillis(), state.getTimestamp())) {
-                input.produce(sessionEvent(new DeleteSessionEvent(), state));
-            }
-        });
+        database.deleteSessionsOlderThan(duration.toMillis());
     }
 
     @Override
     public Set<String> getActiveSessions() {
-        return repo.valuesMap().entrySet().stream()
-                .map(s -> s.getValue().getSessionId()).collect(toSet());
+        return database.getActiveSessions();
     }
 
     @Override
@@ -137,15 +126,6 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
     @Override
     public int getSessionsCountForUserAndBrowser(String user, String browser, String version) {
         return (int) database.countSessionsByUserAndBrowser(user, browser, version);
-    }
-
-    private String toHubHost(String route) {
-        return route != null ? route.replaceFirst(ROUTE_REGEX, "$1") : "";
-    }
-
-    private int toHubPort(String route) {
-        final String portString = route != null ? route.replaceAll(ROUTE_REGEX, "$2") : "";
-        return isNumeric(portString) ? parseInt(portString) : 0;
     }
 
     Set<SessionEvent> sessionsByUser(String user) {

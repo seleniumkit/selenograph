@@ -19,9 +19,9 @@ import javax.inject.Inject;
 import java.util.*;
 import java.util.function.Consumer;
 
-import static com.mongodb.client.model.Filters.and;
-import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.*;
 import static java.lang.String.format;
+import static java.lang.System.currentTimeMillis;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.sort;
@@ -118,6 +118,9 @@ public class SelenographDB {
         sessions().createIndex(new Document(map(
                 "object.inBody.user", 1
         )));
+        sessions().createIndex(new Document(map(
+                "object.inBody.timestamp", 1
+        )));
     }
 
     public Map<String, BrowserSummaries> getQuotasSummary() {
@@ -142,19 +145,6 @@ public class SelenographDB {
 
     public Map<BrowserContext, Integer> sessionsByUserCount() {
         Map<BrowserContext, Integer> results = new HashMap<>();
-        /**
-         {$project: {inBody: 1}},
-         {$unwind: { path: "$inBody", includeArrayIndex: "index" } },
-         {$match: {index: 1} },
-         {$project: {user: "$inBody.user", browser: "$inBody.browser", version: "$inBody.version"}},
-         {$group: {
-         _id: {user:"$user",browser: "$browser", version: "$version"},
-         user: {$first: "$user"},
-         browser: {$first: "$browser"},
-         version: {$first: "$version"},
-         count: {$sum: 1}
-         }})
-         **/
         sessions().aggregate(asList(
                 new Document("$unwind", new Document(map(
                         "path", "$object",
@@ -206,11 +196,24 @@ public class SelenographDB {
     }
 
     public Set<SessionEvent> sessionsByUser(String user) {
-        Set<SessionEvent> result = new LinkedHashSet<>();
+        final Set<SessionEvent> result = new LinkedHashSet<>();
         sessions().find(eq("object.inBody.user", user)).forEach((Consumer<Document>) document ->
                 result.add(convertDocument(document, SessionEvent.class)));
         return result;
     }
+
+    public void deleteSessionsOlderThan(long timeout) {
+        sessions().deleteMany(lt("object.inBody.timestamp", currentTimeMillis() - timeout));
+    }
+
+    public Set<String> getActiveSessions() {
+        final Set<String> result = new LinkedHashSet<>();
+        sessions().find().projection(new Document("_id", 1))
+                .map(d -> d.getString("_id"))
+                .forEach((Consumer<String>) result::add);
+        return result;
+    }
+
 
     public SessionEvent findSessionById(String sessionId) {
         return convertDocument(
@@ -234,4 +237,5 @@ public class SelenographDB {
     private MongoCollection<Document> sessions() {
         return mongo.getDatabase(dbName).getCollection(format("%s%s", sessionsPluginId, COLL_SUFFIX));
     }
+
 }
