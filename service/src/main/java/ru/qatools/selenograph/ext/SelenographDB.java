@@ -136,6 +136,7 @@ public class SelenographDB {
                     running.getOrDefault(quota, emptyMap())
             );
         });
+        state.values().forEach(BrowserSummaries::sort);
         return state;
     }
 
