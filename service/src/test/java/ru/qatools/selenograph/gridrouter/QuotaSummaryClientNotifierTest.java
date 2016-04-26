@@ -17,8 +17,7 @@ import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 import static ru.qatools.selenograph.ext.SelenographDB.ALL;
 
 /**
@@ -42,6 +41,7 @@ public class QuotaSummaryClientNotifierTest extends QuotaStatsAggregatorTest {
         String sessionId3 = startSessionFor("user3", "firefox", "33.0");
         await().atMost(4, SECONDS).until(() -> sessions.getActiveSessions(),
                 hasItems(sessionId1, sessionId2, sessionId3));
+        reset(frontend);
         helper.invokeTimersFor(QuotaSummaryClientNotifier.class);
         final ArgumentCaptor<Map> argument = ArgumentCaptor.forClass(Map.class);
         verify(frontend, timeout(1000)).send(argument.capture());

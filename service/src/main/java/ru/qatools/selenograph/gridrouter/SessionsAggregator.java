@@ -16,11 +16,11 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 
-import static java.lang.Math.toIntExact;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Optional.ofNullable;
 import static ru.qatools.selenograph.gridrouter.Key.browserName;
 import static ru.qatools.selenograph.gridrouter.Key.browserVersion;
+import static ru.yandex.qatools.camelot.api.Constants.Keys.ALL;
 
 /**
  * @author Ilya Sadykov
@@ -44,7 +44,7 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
     @Input(QuotaStatsAggregator.class)
     private EventProducer qutaStats;
     @Repository(QuotaStatsAggregator.class)
-    private AggregatorRepository<SessionsState> statsRepo;
+    private AggregatorRepository<SessionsCountsPerUser> statsRepo;
 
     @NewState
     public Object newState(Class stateClass, SessionEvent event) throws Exception {
@@ -61,17 +61,6 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
         LOGGER.debug("on{} session {} for {}:{}:{} ({})", event.getClass().getSimpleName(),
                 event.getSessionId(), event.getUser(), event.getBrowser(), event.getVersion(), event.getRoute());
         state.setTimestamp(event.getTimestamp());
-    }
-
-    @OnTimer(cron = "${selenograph.quota.stats.update.cron}", perState = false, skipIfNotCompleted = true)
-    public void updateQuotaStats() {
-        database.sessionsByUserCount().entrySet().forEach(e ->
-                qutaStats.produce(new SessionsState()
-                        .withUser(e.getKey().getUser())
-                        .withBrowser(e.getKey().getBrowser())
-                        .withVersion(e.getKey().getVersion())
-                        .withRaw(toIntExact(e.getValue()))
-                ));
     }
 
     @Override
@@ -112,10 +101,9 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
     }
 
     @Override
-    public UserSessionsStats getStats(String user) {
-        final UserSessionsStats res = new UserSessionsStats();
-        res.putAll(statsRepo.valuesMap());
-        return res;
+    public SessionsCountsPerUser getStats(String user) {
+        final SessionsCountsPerUser stats = statsRepo.get(ALL);
+        return stats != null ? stats : new SessionsCountsPerUser();
     }
 
     @Override

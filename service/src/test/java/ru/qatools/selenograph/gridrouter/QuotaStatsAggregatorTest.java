@@ -80,13 +80,16 @@ public class QuotaStatsAggregatorTest {
                 hasItems(sessionId1, sessionId2, sessionId3));
         assertThat(sessions.getSessionsCountForUser("vasya"), is(3));
 
-        helper.invokeTimersFor(SessionsAggregator.class);
+        helper.invokeTimerFor(QuotaStatsAggregator.class, "updateQuotaStats");
         verifyQuotaStatsReceived(1);
-        assertStatsStateFor("vasya", notNullValue());
+        assertSessionsStateFor("vasya", notNullValue());
         SessionsState vasyaStats = await().atMost(2, SECONDS).until(() -> statsFor("vasya"), notNullValue());
         assertThat(vasyaStats.getAvg(), is(2));
         assertThat(vasyaStats.getMax(), is(3));
         assertThat(vasyaStats.getRaw(), is(3));
+        assertThat(vasyaStats.getBrowser(), is("firefox"));
+        assertThat(vasyaStats.getUser(), is("vasya"));
+        assertThat(vasyaStats.getVersion(), is("33.0"));
 
         // Stop two sessions
         stopSessionFor("vasya", sessionId1);
@@ -95,7 +98,7 @@ public class QuotaStatsAggregatorTest {
                 allOf(not(hasItem(sessionId1)), not(hasItem(sessionId2))));
         assertThat(sessions.getSessionsCountForUser("vasya"), is(1));
 
-        helper.invokeTimersFor(SessionsAggregator.class);
+        helper.invokeTimerFor(QuotaStatsAggregator.class, "updateQuotaStats");
         verifyQuotaStatsReceived(1);
         await().atMost(2, SECONDS).until(() -> statsFor("vasya").getRaw(), is(1));
         assertThat(statsFor("vasya").getAvg(), is(2));
@@ -109,7 +112,7 @@ public class QuotaStatsAggregatorTest {
         assertThat(sessions.getSessionsCountForUser("vasya"), is(2));
         assertThat(sessions.getActiveSessions(), containsInAnyOrder(sessionId3, sessionId4));
 
-        helper.invokeTimersFor(SessionsAggregator.class);
+        helper.invokeTimerFor(QuotaStatsAggregator.class, "updateQuotaStats");
         verifyQuotaStatsReceived(1);
         await().atMost(2, SECONDS).until(() -> statsFor("vasya").getRaw(), is(2));
         assertThat(statsFor("vasya").getAvg(), is(2));
@@ -123,35 +126,35 @@ public class QuotaStatsAggregatorTest {
         assertThat(sessions.getSessionsCountForUser("petya"), is(1));
         assertThat(sessions.getSessionsCountForUser("vasya"), is(2));
         assertThat(sessions.getActiveSessions(), containsInAnyOrder(sessionId3, sessionId4, sessionId5));
-        helper.invokeTimersFor(SessionsAggregator.class);
-        verifyQuotaStatsReceived(2);
+        helper.invokeTimerFor(QuotaStatsAggregator.class, "updateQuotaStats");
+        verifyQuotaStatsReceived(1);
         await().atMost(2, SECONDS).until(() -> statsFor("petya"), notNullValue());
         assertThat(statsFor("petya").getAvg(), is(1));
         assertThat(statsFor("petya").getMax(), is(1));
         assertThat(statsFor("petya").getRaw(), is(1));
 
-        helper.invokeTimersFor(QuotaStatsAggregator.class);
+        reset(graphite);
+        helper.invokeTimerFor(QuotaStatsAggregator.class, "resetStats");
+        verify(graphite, timeout(TIMEOUT).times(6)).process(Mockito.any(GraphiteValue.class));
         assertThat(statsFor("petya").getMax(), is(1));
         assertThat(statsFor("petya").getAvg(), is(1));
         assertThat(statsFor("petya").getRaw(), is(1));
         assertThat(statsFor("vasya").getMax(), is(2));
         assertThat(statsFor("vasya").getAvg(), is(2));
         assertThat(statsFor("vasya").getRaw(), is(2));
-        verify(graphite, timeout(TIMEOUT).times(6)).process(Mockito.any(GraphiteValue.class));
-
     }
 
     protected SessionsState statsFor(String user) {
-        return sessions.getStats(user).get(keyFor(user));
+        return sessions.getStats(user).getFor(user, "firefox", "33.0");
     }
 
     private void verifyQuotaStatsReceived(int times) {
         verify(quotaStatsMock, timeout(4000).times(times))
-                .beforeCreate(Mockito.any(), Mockito.any(), Mockito.any());
+                .updateStats(Mockito.any(), Mockito.any(), Mockito.any());
         reset(quotaStatsMock);
     }
 
-    protected void assertStatsStateFor(String user, Matcher<Object> matcher) {
+    protected void assertSessionsStateFor(String user, Matcher<Object> matcher) {
         assertThat(sessionsStorage.get(SessionEvent.class, keyFor(user)),
                 should(matcher).whileWaitingUntil(timeoutHasExpired(TIMEOUT)));
     }

@@ -2,29 +2,40 @@ package ru.qatools.selenograph.gridrouter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.qatools.selenograph.ext.SelenographDB;
 import ru.yandex.qatools.camelot.api.EventProducer;
 import ru.yandex.qatools.camelot.api.annotations.*;
 import ru.yandex.qatools.camelot.plugin.GraphiteReportProcessor;
 import ru.yandex.qatools.camelot.plugin.GraphiteValue;
-import ru.yandex.qatools.fsm.annotations.*;
+import ru.yandex.qatools.fsm.annotations.AfterTransit;
+import ru.yandex.qatools.fsm.annotations.FSM;
+import ru.yandex.qatools.fsm.annotations.Transit;
+import ru.yandex.qatools.fsm.annotations.Transitions;
 
 import javax.inject.Inject;
+import java.util.Map;
 
-import static java.lang.Math.round;
 import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
+import static ru.qatools.selenograph.gridrouter.SessionsCountsPerUser.fromBrowserString;
 
 /**
  * @author Ilya Sadykov
  */
 @Aggregate
-@FSM(start = SessionsState.class)
-@Filter(instanceOf = SessionsState.class)
-@Transitions(@Transit(on = SessionsState.class))
+@FSM(start = SessionsCountsPerUser.class)
+@Filter(instanceOf = SessionsCountsPerUser.class)
+@Transitions(@Transit(on = SessionsCountsPerUser.class))
 public class QuotaStatsAggregator {
-    protected static final Logger LOGGER = LoggerFactory.getLogger(QuotaStatsAggregator.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(QuotaStatsAggregator.class);
     @Inject
     SessionsAggregator sessions;
+
+    @Inject
+    SelenographDB database;
+
+    @Input
+    EventProducer input;
 
     @ConfigValue("selenograph.gridrouter.graphite.prefix")
     String graphitePrefix;
@@ -32,42 +43,34 @@ public class QuotaStatsAggregator {
     @Input(GraphiteReportProcessor.class)
     EventProducer graphite;
 
-    @AggregationKey
-    public String aggregationKey(SessionsState event) {
-        return event.getUser() + ":" + event.getBrowser() + ":" + event.getVersion();
-    }
-
-    @BeforeTransit
-    public void beforeCreate(SessionsState state, SessionsState to, SessionsState event) {
-        state.withUser(event.getUser())
-                .withBrowser(event.getBrowser())
-                .withVersion(event.getVersion())
-                .withRaw(event.getRaw());
-    }
-
     @AfterTransit
-    public void updateStats(SessionsState state, SessionsState to, SessionsState event) {
-        state.setMax(state.getRaw() > state.getMax() ? state.getRaw() : state.getMax());
-        state.setAvg(round(((float) state.getAvg() + (float) state.getRaw()) / 2.0f));
-        state.setTimestamp(currentTimeMillis());
+    public void updateStats(SessionsCountsPerUser state, SessionsCountsPerUser to, SessionsCountsPerUser event) {
+        state.updateStats(event);
+    }
+
+    @OnTimer(cron = "${selenograph.quota.stats.update.cron}", perState = false, skipIfNotCompleted = true)
+    public void updateQuotaStats() {
+        input.produce(new SessionsCountsPerUser(database.sessionsByUserCount()));
     }
 
     @OnTimer(cron = "0 * * * * ?", readOnly = false, skipIfNotCompleted = true)
-    public void resetStats(SessionsState state) {
-        LOGGER.info("Sending stats to graphite for {}:{}:{}...",
-                state.getUser(), state.getBrowser(), state.getVersion());
-        final String prefix = format("%s.%s.%s-%s", graphitePrefix, state.getUser(),
-                state.getBrowser().replace(".", "_"),
-                state.getVersion().replace(".", "_"));
-        final long timestamp = currentTimeMillis() / 1000L;
-        graphite.produce(new GraphiteValue(prefix + ".stats.raw", state.getRaw(), timestamp));
-        graphite.produce(new GraphiteValue(prefix + ".stats.max", state.getMax(), timestamp));
-        graphite.produce(new GraphiteValue(prefix + ".stats.avg", state.getAvg(), timestamp));
-        final int current = sessions.getSessionsCountForUserAndBrowser(
-                state.getUser(), state.getBrowser(), state.getVersion()
-        );
-        state.setMax(current);
-        state.setAvg(current);
-        state.setRaw(current);
+    public void resetStats(SessionsCountsPerUser counts) {
+        final Map<BrowserContext, Integer> current = database.sessionsByUserCount();
+        counts.entrySet().forEach(entry -> {
+            final SessionsState state = entry.getValue();
+            LOGGER.info("Sending stats to graphite for {}:{}:{}...",
+                    state.getUser(), state.getBrowser(), state.getVersion());
+            final String prefix = format("%s.%s.%s-%s", graphitePrefix, state.getUser(),
+                    state.getBrowser().replace(".", "_"),
+                    state.getVersion().replace(".", "_"));
+            final long timestamp = currentTimeMillis() / 1000L;
+            graphite.produce(new GraphiteValue(prefix + ".stats.raw", state.getRaw(), timestamp));
+            graphite.produce(new GraphiteValue(prefix + ".stats.max", state.getMax(), timestamp));
+            graphite.produce(new GraphiteValue(prefix + ".stats.avg", state.getAvg(), timestamp));
+            final Integer currentCount = current.get(fromBrowserString(entry.getKey()));
+            state.setMax(currentCount);
+            state.setAvg(currentCount);
+            state.setRaw(currentCount);
+        });
     }
 }

@@ -55,6 +55,9 @@ public class SelenographMongoSerializer implements MongoSerializer {
     public <T> T fromDBObject(Document input, Class<T> expected)
             throws Exception { //NOSONAR
         try {
+            if (input == null) {
+                return null;
+            }
             final BasicDBList list = new BasicDBList();
             list.addAll((List) input.get(OBJECT_FIELD));
             return (T) objectMapper.readValue(list.toString(), expected);
