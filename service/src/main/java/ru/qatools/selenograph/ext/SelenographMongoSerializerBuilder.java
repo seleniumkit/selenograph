@@ -10,6 +10,6 @@ import ru.yandex.qatools.camelot.mongodb.MongoSerializerBuilder;
 public class SelenographMongoSerializerBuilder extends MongoSerializerBuilder{
     @Override
     public MongoSerializer build(MessagesSerializer msgSerializer, ClassLoader classLoader) {
-        return new SelenographMongoSerializer(msgSerializer, classLoader);
+        return new SelenographMongoSerializer();
     }
 }

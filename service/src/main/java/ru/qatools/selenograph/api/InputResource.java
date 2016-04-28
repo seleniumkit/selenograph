@@ -1,8 +1,10 @@
 package ru.qatools.selenograph.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.CamelContext;
 import org.apache.camel.component.seda.QueueReference;
 import org.apache.camel.component.seda.SedaComponent;
+import ru.qatools.selenograph.ext.jackson.ObjectMapperProvider;
 
 import javax.inject.Inject;
 import javax.ws.rs.*;
@@ -11,6 +13,7 @@ import javax.ws.rs.core.Response;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static java.util.stream.Collectors.toList;
 import static javax.ws.rs.core.MediaType.TEXT_PLAIN;
 import static javax.ws.rs.core.Response.ok;
 
@@ -19,8 +22,8 @@ import static javax.ws.rs.core.Response.ok;
  */
 @Path("/")
 public class InputResource {
+    final static ObjectMapper mapper = new ObjectMapperProvider().provide();
     private static final AtomicLong MESSAGES_COUNT = new AtomicLong();
-
     @Inject
     CamelContext camelContext;
 
@@ -39,6 +42,11 @@ public class InputResource {
             case "clearQueue":
                 getSedaQueues().get(object).getQueue().clear();
                 break;
+            case "printQueue":
+                return ok()
+                        .header("Content-Type", "application/json")
+                        .entity(getSedaQueues().get(object).getQueue().parallelStream().collect(toList()))
+                        .build();
         }
         return ok("ok").build();
     }

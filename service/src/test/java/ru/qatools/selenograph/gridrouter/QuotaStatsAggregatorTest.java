@@ -15,12 +15,10 @@ import java.util.UUID;
 import static com.jayway.awaitility.Awaitility.await;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toSet;
-import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.*;
 import static ru.yandex.qatools.matchers.decorators.MatcherDecorators.should;
 import static ru.yandex.qatools.matchers.decorators.TimeoutWaiter.timeoutHasExpired;
@@ -39,12 +37,6 @@ public class QuotaStatsAggregatorTest {
     @Autowired
     SessionsAggregator sessions;
 
-    @AggregatorState(SessionsAggregator.class)
-    AggregatorStateStorage sessionsStorage;
-
-    @PluginMock
-    SessionsAggregator sessionsMock;
-
     @PluginMock
     QuotaStatsAggregator quotaStatsMock;
 
@@ -53,13 +45,14 @@ public class QuotaStatsAggregatorTest {
 
     @Test
     public void testUpdateAfterRemoved() throws Exception {
-        helper.sendTo(SessionsAggregator.class, new UpdateSessionEvent()
-                .withSessionId("sessionId").withBrowser("browser").withVersion("version").withUser("user"));
-        verify(sessionsMock, timeout(2000)).beforeUpdate(any(), argThat(
-                hasProperty("sessionId", equalTo("sessionId"))
-        ));
+        sessions.updateSession("sessionId", "route");
+        flushSessionsBuffer();
         await().atMost(4, SECONDS).until(() -> sessions.getActiveSessions(), not(hasItems("sessionId")));
         sessions.deleteSession("sessionId");
+    }
+
+    private void flushSessionsBuffer() {
+        sessions.flushBulkUpsertBuffer();
     }
 
     @Test
@@ -68,21 +61,17 @@ public class QuotaStatsAggregatorTest {
         String sessionId1 = startSessionFor("vasya");
         String sessionId2 = startSessionFor("vasya");
         String sessionId3 = startSessionFor("vasya");
-        assertSessionStateFor("vasya", sessionId1, notNullValue());
-        assertSessionStateFor("vasya", sessionId2, notNullValue());
-        assertSessionStateFor("vasya", sessionId3, notNullValue());
-
+        await().atMost(4, SECONDS).until(() -> activeSessionsFor("vasya"),
+                hasItems(sessionId1, sessionId2, sessionId3));
+        assertThat(sessions.getSessionsCountForUser("vasya"), is(3));
         sessions.updateSession(sessionId1);
         sessions.updateSession(sessionId2);
         sessions.updateSession(sessionId3);
 
-        await().atMost(4, SECONDS).until(() -> activeSessionsFor("vasya"),
-                hasItems(sessionId1, sessionId2, sessionId3));
-        assertThat(sessions.getSessionsCountForUser("vasya"), is(3));
+        assertThat(activeSessionsFor("vasya"), hasItems(sessionId1, sessionId2, sessionId3));
 
         helper.invokeTimerFor(QuotaStatsAggregator.class, "updateQuotaStats");
         verifyQuotaStatsReceived(1);
-        assertSessionsStateFor("vasya", notNullValue());
         SessionsState vasyaStats = await().atMost(2, SECONDS).until(() -> statsFor("vasya"), notNullValue());
         assertThat(vasyaStats.getAvg(), is(2));
         assertThat(vasyaStats.getMax(), is(3));
@@ -154,13 +143,8 @@ public class QuotaStatsAggregatorTest {
         reset(quotaStatsMock);
     }
 
-    protected void assertSessionsStateFor(String user, Matcher<Object> matcher) {
-        assertThat(sessionsStorage.get(SessionEvent.class, keyFor(user)),
-                should(matcher).whileWaitingUntil(timeoutHasExpired(TIMEOUT)));
-    }
-
     protected void assertSessionStateFor(String user, String sessionId, Matcher<Object> matcher) {
-        assertThat(sessionsStorage.get(SessionEvent.class, keyFor(user) + ":" + sessionId),
+        assertThat(sessions.findSessionById(sessionId),
                 should(matcher).whileWaitingUntil(timeoutHasExpired(TIMEOUT)));
     }
 
@@ -168,16 +152,15 @@ public class QuotaStatsAggregatorTest {
         return sessions.sessionsByUser(user).stream().map(SessionEvent::getSessionId).collect(toSet());
     }
 
-    protected String keyFor(String user) {
-        return user + ":firefox:33.0";
-    }
-
     protected void stopSessionFor(String user, String sessionId) {
         sessions.deleteSession(sessionId);
+        flushSessionsBuffer();
     }
 
     protected String startSessionFor(String user) {
-        return startSessionFor(user, "firefox", "33.0");
+        final String sessionId = startSessionFor(user, "firefox", "33.0");
+        flushSessionsBuffer();
+        return sessionId;
     }
 
     protected String startSessionFor(String user, String browser, String version) {

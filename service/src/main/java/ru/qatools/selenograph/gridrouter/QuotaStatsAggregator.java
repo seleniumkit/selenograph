@@ -67,7 +67,10 @@ public class QuotaStatsAggregator {
             graphite.produce(new GraphiteValue(prefix + ".stats.raw", state.getRaw(), timestamp));
             graphite.produce(new GraphiteValue(prefix + ".stats.max", state.getMax(), timestamp));
             graphite.produce(new GraphiteValue(prefix + ".stats.avg", state.getAvg(), timestamp));
-            final Integer currentCount = current.get(fromBrowserString(entry.getKey()));
+            Integer currentCount = current.get(fromBrowserString(entry.getKey()));
+            if (currentCount == null) {
+                currentCount = 0;
+            }
             state.setMax(currentCount);
             state.setAvg(currentCount);
             state.setRaw(currentCount);

@@ -40,9 +40,16 @@ public class SelenographDeserializers extends Deserializers.Base {
 
         @Override
         public Long deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
-            if (p.hasToken(JsonToken.START_OBJECT)) {
+            final boolean array = p.hasToken(JsonToken.START_ARRAY);
+            if (p.hasToken(JsonToken.START_OBJECT) || array) {
                 p.nextToken();
-                long value = Long.parseLong(p.nextTextValue());
+                long value;
+                if(array){
+                    p.nextToken();
+                    value = Long.parseLong(p.getText());
+                } else {
+                    value = Long.parseLong(p.nextTextValue());
+                }
                 p.nextToken();
                 return value;
             }

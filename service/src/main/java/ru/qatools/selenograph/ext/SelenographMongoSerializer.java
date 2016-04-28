@@ -9,7 +9,6 @@ import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.qatools.selenograph.ext.jackson.ObjectMapperProvider;
-import ru.yandex.qatools.camelot.common.MessagesSerializer;
 import ru.yandex.qatools.camelot.mongodb.MongoSerializer;
 
 import java.util.List;
@@ -21,14 +20,10 @@ import java.util.List;
 public class SelenographMongoSerializer implements MongoSerializer {
     public static final String OBJECT_FIELD = "object";
     private static final Logger LOGGER = LoggerFactory.getLogger(SelenographMongoSerializer.class);
-    private final MessagesSerializer serializer;
-    private final ClassLoader classLoader;
     private final ObjectMapper objectMapper;
 
     @SuppressWarnings("deprecation")
-    public SelenographMongoSerializer(MessagesSerializer serializer, ClassLoader classLoader) {
-        this.serializer = serializer;
-        this.classLoader = classLoader;
+    public SelenographMongoSerializer() {
         this.objectMapper = new ObjectMapperProvider().provide();
     }
 

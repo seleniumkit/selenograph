@@ -1,23 +1,19 @@
 package ru.qatools.selenograph.gridrouter;
 
+import org.eclipse.jetty.util.ConcurrentArrayQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import ru.qatools.gridrouter.sessions.StatsCounter;
 import ru.qatools.selenograph.ext.SelenographDB;
-import ru.yandex.qatools.camelot.api.AggregatorRepository;
-import ru.yandex.qatools.camelot.api.EventProducer;
-import ru.yandex.qatools.camelot.api.annotations.*;
 import ru.yandex.qatools.camelot.common.ProcessingEngine;
-import ru.yandex.qatools.fsm.StopConditionAware;
-import ru.yandex.qatools.fsm.annotations.*;
 
 import javax.inject.Inject;
 import java.time.Duration;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import static java.lang.System.currentTimeMillis;
-import static java.util.Optional.ofNullable;
 import static ru.qatools.selenograph.gridrouter.Key.browserName;
 import static ru.qatools.selenograph.gridrouter.Key.browserVersion;
 import static ru.yandex.qatools.camelot.api.Constants.Keys.ALL;
@@ -25,42 +21,26 @@ import static ru.yandex.qatools.camelot.api.Constants.Keys.ALL;
 /**
  * @author Ilya Sadykov
  */
-@Aggregate
-@Filter(custom = SessionEventFilter.class)
-@FSM(start = UndefinedSessionState.class)
-@Transitions({
-        @Transit(to = StartSessionEvent.class, on = SessionEvent.class),
-        @Transit(on = DeleteSessionEvent.class, stop = true)
-})
-public class SessionsAggregator implements StatsCounter, StopConditionAware<SessionEvent, SessionEvent> {
+public class SessionsAggregator implements StatsCounter {
     static final String ROUTE_REGEX = "http://([^:]+):(\\d+)";
     private static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
+    private static final Queue<SessionEvent> bulkUpsertQueue = new ConcurrentArrayQueue<>();
     @Inject
     SelenographDB database;
     @Inject
     ProcessingEngine procEngine;
-    @Input(SessionsAggregator.class)
-    private EventProducer input;
-    @Input(QuotaStatsAggregator.class)
-    private EventProducer qutaStats;
-    @Repository(QuotaStatsAggregator.class)
-    private AggregatorRepository<SessionsCountsPerUser> statsRepo;
 
-    @NewState
-    public Object newState(Class stateClass, SessionEvent event) throws Exception {
-        return event.withTimestamp(currentTimeMillis());
-    }
-
-    @AggregationKey
-    public String aggregationKey(SessionEvent event) {
-        return event.getSessionId();
-    }
-
-    @BeforeTransit
-    public void beforeUpdate(SessionEvent state, SessionEvent event) {
-        LOGGER.debug("on{} session {} for {}:{}:{} ({})", event.getClass().getSimpleName(),
-                event.getSessionId(), event.getUser(), event.getBrowser(), event.getVersion(), event.getRoute());
-        state.setTimestamp(event.getTimestamp());
+    @Autowired
+    public SessionsAggregator(@Value("${selenograph.sessions.bulk.flush.interval.ms}")
+                              long bulkFlushIntervalMs){
+        final Timer bulkTimer = new Timer();
+        LOGGER.info("Initializing bulk flush timer...");
+        bulkTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                flushBulkUpsertBuffer();
+            }
+        }, new Random().nextInt(100), bulkFlushIntervalMs);
     }
 
     @Override
@@ -75,19 +55,20 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
                 .withBrowser(name)
                 .withVersion(ver)
                 .withTimestamp(currentTimeMillis());
-        input.produce(startEvent);
+        bulkUpsertQueue.add(startEvent);
     }
 
     @Override
     public void deleteSession(String sessionId, String route) {
         LOGGER.info("Removing session {} ({})", sessionId, route);
-        findSessionById(sessionId).ifPresent(s -> input.produce(sessionEvent(new DeleteSessionEvent(), s)));
+        bulkUpsertQueue.add(new DeleteSessionEvent().withSessionId(sessionId).withRoute(route));
     }
 
     @Override
     public void updateSession(String sessionId, String route) {
         LOGGER.info("Updating session {} ({})", sessionId, route);
-        findSessionById(sessionId).ifPresent(s -> input.produce(sessionEvent(new UpdateSessionEvent(), s)));
+        bulkUpsertQueue.add((SessionEvent) new UpdateSessionEvent()
+                .withSessionId(sessionId).withRoute(route).withTimestamp(currentTimeMillis()));
     }
 
     @Override
@@ -102,7 +83,8 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
 
     @Override
     public SessionsCountsPerUser getStats(String user) {
-        final SessionsCountsPerUser stats = statsRepo.get(ALL);
+        final SessionsCountsPerUser stats = (SessionsCountsPerUser) procEngine.getInterop()
+                .repo(QuotaStatsAggregator.class).get(ALL);
         return stats != null ? stats : new SessionsCountsPerUser();
     }
 
@@ -120,26 +102,19 @@ public class SessionsAggregator implements StatsCounter, StopConditionAware<Sess
         return database.sessionsByUser(user);
     }
 
-    private Optional<SessionEvent> findSessionById(String sessionId) {
-        return ofNullable(database.findSessionById(sessionId));
+    public void flushBulkUpsertBuffer() {
+        LOGGER.info("Flushing upsert buffer. Queue size is {}", bulkUpsertQueue.size());
+        SessionEvent event;
+        final List<SessionEvent> events = new ArrayList<>();
+        while ((event = bulkUpsertQueue.poll()) != null) {
+            events.add(event);
+        }
+        if(!events.isEmpty()){
+            database.bulkUpsertSessions(events);
+        }
     }
 
-    @SuppressWarnings("unchecked")
-    private <E extends SessionEvent> E sessionEvent(E event, SessionEvent state) {
-        return (E) event.withUser(state.getUser())
-                .withBrowser(state.getBrowser())
-                .withVersion(state.getVersion())
-                .withRoute(state.getRoute())
-                .withSessionId(state.getSessionId())
-                .withTimestamp(currentTimeMillis());
-    }
-
-    @Override
-    public boolean isStopRequired(SessionEvent state, SessionEvent event) {
-        return !(state instanceof StartSessionEvent)
-                || state.getBrowser() == null
-                || state.getVersion() == null
-                || state.getUser() == null
-                || state.getSessionId() == null;
+    public SessionEvent findSessionById(String sessionId) {
+        return database.findSessionById(sessionId);
     }
 }

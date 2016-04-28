@@ -19,16 +19,13 @@
                 brokerConfig="?concurrentConsumers=1">
             <processor>ru.qatools.selenograph.gridrouter.QuotaSummaryClientNotifier</processor>
         </plugin>
-        <plugin id="requestsQueue" source="quotaClientNotifier">
+        <plugin id="requestsQueue">
             <aggregator>ru.qatools.selenograph.gridrouter.QueueWaitAvailableBrowsersChecker</aggregator>
         </plugin>
-        <plugin id="quotaSessions" source="quotaClientNotifier">
-            <aggregator>ru.qatools.selenograph.gridrouter.SessionsAggregator</aggregator>
-        </plugin>
-        <plugin id="quotaStats" source="quotaSessions">
+        <plugin id="quotaStats">
             <aggregator>ru.qatools.selenograph.gridrouter.QuotaStatsAggregator</aggregator>
         </plugin>
-        <plugin id="graphite" source="graphite">
+        <plugin id="graphite">
             <processor>ru.yandex.qatools.camelot.plugin.GraphiteReportProcessor</processor>
         </plugin>
     </source>
