@@ -22,7 +22,7 @@
     <properties>
         <compile.version>1.8</compile.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <gridrouter.version>1.28</gridrouter.version>
+        <gridrouter.version>1.29</gridrouter.version>
         <camelot.version>2.5.2</camelot.version>
     </properties>
 
