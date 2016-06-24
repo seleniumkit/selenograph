@@ -12,6 +12,7 @@
     <bean class="${selenograph.gridrouter.hostSelectionStrategy}"/>
     <bean class="${selenograph.gridrouter.statsCounter}"/>
     <bean class="${selenograph.gridrouter.requestQueueChecker}"/>
+    <bean id="configRepository" class="${grid.router.quota.repository}"/>
 
     <!-- Camelot + Spring -->
     <bean id="camelot-context-injector" class="ru.yandex.qatools.camelot.core.impl.SpringContextInjector"/>
