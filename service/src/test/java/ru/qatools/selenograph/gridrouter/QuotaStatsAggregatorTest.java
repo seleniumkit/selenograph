@@ -1,10 +1,12 @@
 package ru.qatools.selenograph.gridrouter;
 
 import org.hamcrest.Matcher;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import ru.qatools.selenograph.ext.SelenographDB;
 import ru.yandex.qatools.camelot.plugin.GraphiteReportProcessor;
 import ru.yandex.qatools.camelot.plugin.GraphiteValue;
 import ru.yandex.qatools.camelot.test.*;
@@ -33,6 +35,9 @@ public class QuotaStatsAggregatorTest {
 
     @Helper
     TestHelper helper;
+
+    @Autowired
+    SelenographDB db;
 
     @Autowired
     SessionsAggregator sessions;
@@ -133,6 +138,11 @@ public class QuotaStatsAggregatorTest {
         assertThat(statsFor("vasya").getRaw(), is(2));
     }
 
+    @After
+    public void tearDown() throws Exception {
+        db.deleteSessionsOlderThan(0L);
+    }
+
     protected SessionsState statsFor(String user) {
         return sessions.getStats(user).getFor(user, "firefox", "33.0");
     }
@@ -166,6 +176,7 @@ public class QuotaStatsAggregatorTest {
     protected String startSessionFor(String user, String browser, String version) {
         final String sessionId = UUID.randomUUID().toString();
         sessions.startSession(sessionId, user, browser, version);
+        flushSessionsBuffer();
         return sessionId;
     }
 }
