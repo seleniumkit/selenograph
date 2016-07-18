@@ -8,7 +8,7 @@ import java.util.Objects;
 public class UserBrowser extends BrowserContext {
     @Override
     public boolean equals(Object object) {
-        return object != null &&
+        return object != null && //NOSONAR
                 object instanceof UserBrowser &&
                 Objects.equals(((UserBrowser) object).getBrowser(), getBrowser()) &&
                 Objects.equals(((UserBrowser) object).getVersion(), getVersion()) &&

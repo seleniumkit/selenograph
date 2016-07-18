@@ -2,7 +2,7 @@ package ru.qatools.selenograph.gridrouter;
 
 import java.io.Serializable;
 import java.time.Duration;
-import java.time.temporal.Temporal;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,8 +12,8 @@ import static java.util.stream.Collectors.toList;
 /**
  * @author Ilya Sadykov
  */
-public class WaitAvailableBrowserState extends BrowserContext implements Serializable {
-    private Map<String, Temporal> requestIds = new HashMap<>();
+public class WaitAvailableBrowserState extends BrowserContext implements Serializable { //NOSONAR
+    private Map<String, ZonedDateTime> requestIds = new HashMap<>();
 
     public void addRequest(String requestId) {
         requestIds.put(requestId, now());

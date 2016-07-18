@@ -22,12 +22,7 @@ import static java.lang.String.format;
 public class QueueWaitAvailableBrowsersChecker extends WaitAvailableBrowsersChecker {
     private static final Logger LOGGER = LoggerFactory.getLogger(QueueWaitAvailableBrowsersChecker.class);
     @Input
-    EventProducer input;
-
-    @Override
-    public void ensureFreeBrowsersAvailable(String user, String remoteHost, String browser, Version version) {
-        super.ensureFreeBrowsersAvailable(user, remoteHost, browser, version);
-    }
+    private EventProducer input;
 
     @Override
     protected void onWait(String user, String browser, Version version, String requestId, int waitAttempt) {

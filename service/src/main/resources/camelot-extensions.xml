@@ -32,7 +32,6 @@
     <bean id="selenograph-db-access" class="ru.qatools.selenograph.ext.SelenographDB" init-method="init">
         <constructor-arg name="mongo" ref="camelot-mongodb-client"/>
         <constructor-arg name="dbName" value="${camelot.mongodb.dbname}"/>
-        <constructor-arg name="processingEngine" ref="camelot-processing-engine"/>
         <constructor-arg name="serializer" ref="selenograph-mongo-serializer"/>
     </bean>
 </beans>

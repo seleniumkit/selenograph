@@ -19,6 +19,7 @@ public class SessionsCountsPerUser extends HashMap<String, SessionsState> implem
     }
 
     public SessionsCountsPerUser() {
+        // need to have no-args constructor
     }
 
     public static BrowserContext fromBrowserString(String browser) {

@@ -16,7 +16,7 @@ public class BrowserSummaries extends ArrayList<BrowserSummary> implements List<
 
     public void addOrIncrement(Map<BrowserContext, Integer> availableMap,
                                Map<BrowserContext, Integer> runningMap) {
-        availableMap.entrySet().forEach(e -> {
+        availableMap.entrySet().forEach(e -> { //NOSONAR
             final BrowserContext bc = e.getKey();
             int max = e.getValue();
             int running = runningMap.getOrDefault(e.getKey(), 0);

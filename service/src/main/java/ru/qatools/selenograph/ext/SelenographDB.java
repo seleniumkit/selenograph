@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import ru.qatools.gridrouter.ConfigRepository;
 import ru.qatools.gridrouter.config.Browsers;
 import ru.qatools.selenograph.gridrouter.*;
-import ru.yandex.qatools.camelot.common.ProcessingEngine;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -42,17 +41,14 @@ public class SelenographDB {
     private static final String SESSIONS_COL_NAME = "sessions";
     private final MongoClient mongo;
     private final String dbName;
-    private final ProcessingEngine engine;
     private final SelenographMongoSerializer serializer;
     @Inject
     private ConfigRepository config;
 
     public SelenographDB(MongoClient mongo, String dbName,
-                         SelenographMongoSerializer serializer,
-                         ProcessingEngine processingEngine) {
+                         SelenographMongoSerializer serializer) {
         this.mongo = mongo;
         this.dbName = dbName;
-        this.engine = processingEngine;
         this.serializer = serializer;
     }
 
@@ -64,8 +60,7 @@ public class SelenographDB {
             res.putIfAbsent(quota, new LinkedHashMap<>());
             e.getValue().getBrowsers().forEach(b ->
                     b.getVersions().forEach(v -> {
-                        final BrowserContext key = new UserBrowser()
-                                .withBrowser(browserName(b.getName()))
+                        final BrowserContext key = new UserBrowser().withBrowser(browserName(b.getName()))
                                 .withVersion(browserVersion(v.getNumber()))
                                 .withTimestamp(0);
                         v.getRegions().parallelStream()

@@ -31,7 +31,7 @@ public class SelenographDeserializers extends Deserializers.Base {
     }
 
     private static class LongDeserializer extends StdDeserializer<Long> {
-        NumberDeserializers.LongDeserializer longDeserializer =
+        NumberDeserializers.LongDeserializer longDeserializer = //NOSONAR
                 new NumberDeserializers.LongDeserializer(Long.class, 0L);
 
         LongDeserializer() {
@@ -58,7 +58,7 @@ public class SelenographDeserializers extends Deserializers.Base {
     }
 
     private static class DateDeserializer extends StdDeserializer<Date> {
-        DateDeserializers.DateDeserializer dateDeserializer = new DateDeserializers.DateDeserializer();
+        DateDeserializers.DateDeserializer dateDeserializer = new DateDeserializers.DateDeserializer(); //NOSONAR
 
         protected DateDeserializer() {
             super(Date.class);
