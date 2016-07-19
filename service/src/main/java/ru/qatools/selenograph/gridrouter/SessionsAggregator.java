@@ -32,7 +32,7 @@ public class SessionsAggregator implements StatsCounter {
 
     @Autowired
     public SessionsAggregator(@Value("${selenograph.sessions.bulk.flush.interval.ms}")
-                              long bulkFlushIntervalMs){
+                                      long bulkFlushIntervalMs) {
         final Timer bulkTimer = new Timer();
         LOGGER.info("Initializing bulk flush timer...");
         bulkTimer.schedule(new TimerTask() {
@@ -109,8 +109,12 @@ public class SessionsAggregator implements StatsCounter {
         while ((event = bulkUpsertQueue.poll()) != null) {
             events.add(event);
         }
-        if(!events.isEmpty()){
-            database.bulkUpsertSessions(events);
+        if (!events.isEmpty()) {
+            try {
+                database.bulkUpsertSessions(events);
+            } catch (Exception e) {
+                LOGGER.error("Failed to perform bulk update of sessions", e);
+            }
         }
     }
 
