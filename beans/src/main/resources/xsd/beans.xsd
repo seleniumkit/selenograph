@@ -18,6 +18,7 @@
         <xsd:attribute name="browser" type="xsd:string" use="optional"/>
         <xsd:attribute name="version" type="xsd:string" use="optional"/>
         <xsd:attribute name="user" type="xsd:string" use="optional"/>
+        <xsd:attribute name="route" type="xsd:string" use="optional"/>
     </xsd:complexType>
 
     <xsd:complexType name="SessionsState">
@@ -35,12 +36,38 @@
         <xsd:complexContent>
             <xsd:extension base="BrowserContext">
                 <xsd:attribute name="sessionId" type="xsd:string" use="required"/>
-                <xsd:attribute name="route" type="xsd:string" use="required"/>
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="SessionRequest" abstract="true">
+        <xsd:complexContent>
+            <xsd:extension base="BrowserContext">
+                <xsd:attribute name="requestId" type="xsd:string" use="required"/>
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="SessionRequestEnqueued">
+        <xsd:complexContent>
+            <xsd:extension base="SessionRequest">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+    <xsd:complexType name="SessionRequestDequeued">
+        <xsd:complexContent>
+            <xsd:extension base="SessionRequest">
             </xsd:extension>
         </xsd:complexContent>
     </xsd:complexType>
 
     <xsd:complexType name="StartSessionEvent">
+        <xsd:complexContent>
+            <xsd:extension base="SessionEvent">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+    <xsd:complexType name="UpdateSessionEvent">
         <xsd:complexContent>
             <xsd:extension base="SessionEvent">
             </xsd:extension>

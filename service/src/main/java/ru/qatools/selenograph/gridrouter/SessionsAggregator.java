@@ -1,92 +1,47 @@
 package ru.qatools.selenograph.gridrouter;
 
+import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import ru.qatools.gridrouter.sessions.StatsCounter;
-import ru.qatools.selenograph.BrowserInfo;
-import ru.qatools.selenograph.BrowserStarted;
-import ru.qatools.selenograph.SessionReleasing;
-import ru.qatools.selenograph.plugins.HubBrowserStateAggregator;
-import ru.yandex.qatools.camelot.api.AggregatorRepository;
-import ru.yandex.qatools.camelot.api.EventProducer;
-import ru.yandex.qatools.camelot.api.annotations.*;
-import ru.yandex.qatools.fsm.annotations.*;
+import ru.qatools.selenograph.ext.SelenographDB;
+import ru.yandex.qatools.camelot.common.ProcessingEngine;
 
+import javax.inject.Inject;
 import java.time.Duration;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
-import static java.lang.Integer.parseInt;
 import static java.lang.System.currentTimeMillis;
-import static java.time.Duration.between;
-import static java.time.ZonedDateTime.now;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
-import static org.apache.commons.lang3.StringUtils.isNumeric;
-import static ru.qatools.selenograph.util.Key.browserName;
-import static ru.qatools.selenograph.util.Key.browserVersion;
+import static ru.qatools.selenograph.gridrouter.Key.browserName;
+import static ru.qatools.selenograph.gridrouter.Key.browserVersion;
+import static ru.yandex.qatools.camelot.api.Constants.Keys.ALL;
 
 /**
  * @author Ilya Sadykov
  */
-@Aggregate
-@Filter(custom = SessionEventFilter.class)
-@FSM(start = UndefinedSessionState.class)
-@Transitions({
-        @Transit(to = StartSessionEvent.class, on = StartSessionEvent.class),
-        @Transit(on = DeleteSessionEvent.class, stop = true)
-})
 public class SessionsAggregator implements StatsCounter {
-    public static final String ROUTE_REGEX = "http://([^:]+):(\\d+)";
-    protected static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
-    @Input(HubBrowserStateAggregator.class)
-    EventProducer browserStates;
-    @Input(QuotaStatsAggregator.class)
-    EventProducer quotaStats;
-    @Input(SessionsAggregator.class)
-    private EventProducer input;
+    static final String ROUTE_REGEX = "http://([^:]+):(\\d+)";
+    private static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
+    private static final int MAX_BULK_SIZE = 1000;
+    private static final Queue<SessionEvent> bulkUpsertQueue = new CircularFifoQueue<>(MAX_BULK_SIZE);
+    @Inject
+    SelenographDB database;
+    @Inject
+    ProcessingEngine procEngine;
 
-    @Repository(SessionsAggregator.class)
-    private AggregatorRepository<SessionEvent> repo;
-
-    @Repository(QuotaStatsAggregator.class)
-    private AggregatorRepository<SessionsState> quotaStatsRepo;
-
-    @NewState
-    public Object newState(Class stateClass, StartSessionEvent event) throws Exception {
-        return event.withTimestamp(now());
-    }
-
-    @AggregationKey
-    public String aggregationKey(SessionEvent event) {
-        return event.getUser() + ":" + event.getBrowser() + ":" + event.getVersion() + ":" + event.getSessionId();
-    }
-
-    @OnTransit
-    public void onStart(UndefinedSessionState state, StartSessionEvent event) {
-        LOGGER.debug("onStart session {} for {}:{}:{} ({})", event.getSessionId(), event.getUser(),
-                event.getBrowser(), event.getVersion(), event.getRoute());
-        quotaStats.produce(event);
-        browserStates.produce(new BrowserStarted().withSessionId(event.getSessionId())
-                .withHubHost(toHubHost(event.getRoute()))
-                .withHubPort(toHubPort(event.getRoute()))
-                .withTimestamp(currentTimeMillis())
-                .withBrowserInfo(new BrowserInfo().withName(event.getBrowser()).withVersion(event.getVersion()))
-        );
-    }
-
-    @OnTransit
-    public void onDelete(StartSessionEvent state, DeleteSessionEvent event) {
-        LOGGER.debug("onDelete session {} for {}:{}:{} ({})", event.getSessionId(), event.getUser(),
-                event.getBrowser(), event.getVersion(), event.getRoute());
-        quotaStats.produce(deleteEvent(state));
-        browserStates.produce(new SessionReleasing().withSessionId(event.getSessionId())
-                .withHubHost(toHubHost(state.getRoute())).withHubPort(toHubPort(state.getRoute()))
-                .withTimestamp(currentTimeMillis())
-                .withBrowserInfo(new BrowserInfo().withName(state.getBrowser())
-                        .withVersion(state.getVersion()))
-        );
+    @Autowired
+    public SessionsAggregator(@Value("${selenograph.sessions.bulk.flush.interval.ms}")
+                                      long bulkFlushIntervalMs) {
+        final Timer bulkTimer = new Timer();
+        LOGGER.info("Initializing bulk flush timer...");
+        bulkTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                flushBulkUpsertBuffer();
+            }
+        }, new Random().nextInt(100), bulkFlushIntervalMs);
     }
 
     @Override
@@ -94,72 +49,77 @@ public class SessionsAggregator implements StatsCounter {
         final String name = browserName(browser);
         final String ver = browserVersion(version);
         LOGGER.info("Starting session {} for {}:{}:{} ({})", sessionId, user, name, ver, route);
-        final StartSessionEvent startEvent = new StartSessionEvent()
+        final StartSessionEvent startEvent = (StartSessionEvent) new StartSessionEvent()
                 .withSessionId(sessionId)
                 .withRoute(route)
                 .withUser(user)
                 .withBrowser(name)
-                .withVersion(ver);
-        input.produce(startEvent);
+                .withVersion(ver)
+                .withTimestamp(currentTimeMillis());
+        bulkUpsertQueue.add(startEvent);
     }
 
     @Override
     public void deleteSession(String sessionId, String route) {
         LOGGER.info("Removing session {} ({})", sessionId, route);
-        input.produce(deleteEvent(findSessionById(sessionId)));
+        bulkUpsertQueue.add(new DeleteSessionEvent().withSessionId(sessionId).withRoute(route));
     }
 
-    private String toHubHost(String route) {
-        return route != null ? route.replaceFirst(ROUTE_REGEX, "$1") : "";
-    }
-
-    private int toHubPort(String route) {
-        final String portString = route != null ? route.replaceAll(ROUTE_REGEX, "$2") : "";
-        return isNumeric(portString) ? parseInt(portString) : 0;
+    @Override
+    public void updateSession(String sessionId, String route) {
+        LOGGER.info("Updating session {} ({})", sessionId, route);
+        bulkUpsertQueue.add((SessionEvent) new UpdateSessionEvent()
+                .withSessionId(sessionId).withRoute(route).withTimestamp(currentTimeMillis()));
     }
 
     @Override
     public void expireSessionsOlderThan(Duration duration) {
-        repo.valuesMap().values().forEach(state -> {
-            if (duration.compareTo(between(state.getTimestamp(), now())) < 0) {
-                input.produce(deleteEvent(state));
-            }
-        });
+        database.deleteSessionsOlderThan(duration.toMillis());
     }
 
     @Override
     public Set<String> getActiveSessions() {
-        return repo.valuesMap().entrySet().stream()
-                .map(s -> s.getValue().getSessionId()).collect(toSet());
+        return database.getActiveSessions();
     }
 
     @Override
-    public UserSessionsStats getStats(String user) {
-        return new UserSessionsStats(quotaStatsRepo.valuesMap().entrySet().stream()
-                .filter(state -> state.getValue().getUser().equals(user))
-                .map(Map.Entry::getValue)
-                .collect(toList()), repo.valuesMap());
+    public SessionsCountsPerUser getStats(String user) {
+        final SessionsCountsPerUser stats = (SessionsCountsPerUser) procEngine.getInterop()
+                .repo(QuotaStatsAggregator.class).get(ALL);
+        return stats != null ? stats : new SessionsCountsPerUser();
     }
 
-    public long countSessionsByUser(String user) {
-        return repo.keys().stream().filter(s -> s.startsWith(user + ":")).count();
+    @Override
+    public int getSessionsCountForUser(String user) {
+        return (int) database.countSessionsByUser(user);
     }
 
-    public long countSessionsByUserAndBrowser(String user, String browser, String version) {
-        return repo.keys().stream().filter(s -> s.startsWith(user + ":" + browser+ ":" + version)).count();
+    @Override
+    public int getSessionsCountForUserAndBrowser(String user, String browser, String version) {
+        return (int) database.countSessionsByUserAndBrowser(user, browser, version);
+    }
+
+    Set<SessionEvent> sessionsByUser(String user) {
+        return database.sessionsByUser(user);
+    }
+
+    public void flushBulkUpsertBuffer() {
+        try {
+            LOGGER.info("Flushing upsert buffer. Queue size is {}", bulkUpsertQueue.size());
+            SessionEvent event;
+            final List<SessionEvent> events = new ArrayList<>();
+            while ((event = bulkUpsertQueue.poll()) != null) {
+                events.add(event);
+            }
+            if (!events.isEmpty()) {
+                database.bulkUpsertSessions(events);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to perform bulk update of sessions", e);
+        }
     }
 
     public SessionEvent findSessionById(String sessionId) {
-        final Optional<Map.Entry<String, SessionEvent>> context = repo.valuesMap()
-                .entrySet().stream().filter(s -> s.getKey().contains(sessionId)).findFirst();
-        return context.isPresent() ? context.get().getValue() : null;
-    }
-
-    private DeleteSessionEvent deleteEvent(SessionEvent state) {
-        return new DeleteSessionEvent().withUser(state.getUser())
-                .withBrowser(state.getBrowser())
-                .withVersion(state.getVersion())
-                .withRoute(state.getRoute())
-                .withSessionId(state.getSessionId());
+        return database.findSessionById(sessionId);
     }
 }
