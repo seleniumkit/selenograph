@@ -1,10 +1,8 @@
 package ru.qatools.selenograph.api;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.CamelContext;
 import org.apache.camel.component.seda.QueueReference;
 import org.apache.camel.component.seda.SedaComponent;
-import ru.qatools.selenograph.ext.jackson.ObjectMapperProvider;
 
 import javax.inject.Inject;
 import javax.ws.rs.*;
@@ -22,7 +20,6 @@ import static javax.ws.rs.core.Response.ok;
  */
 @Path("/")
 public class InputResource {
-    final static ObjectMapper mapper = new ObjectMapperProvider().provide();
     private static final AtomicLong MESSAGES_COUNT = new AtomicLong();
     @Inject
     CamelContext camelContext;
