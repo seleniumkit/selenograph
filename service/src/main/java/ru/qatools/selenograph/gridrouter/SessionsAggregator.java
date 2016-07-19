@@ -1,6 +1,6 @@
 package ru.qatools.selenograph.gridrouter;
 
-import org.eclipse.jetty.util.ConcurrentArrayQueue;
+import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +24,8 @@ import static ru.yandex.qatools.camelot.api.Constants.Keys.ALL;
 public class SessionsAggregator implements StatsCounter {
     static final String ROUTE_REGEX = "http://([^:]+):(\\d+)";
     private static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
-    private static final Queue<SessionEvent> bulkUpsertQueue = new ConcurrentArrayQueue<>();
+    private static final int MAX_BULK_SIZE = 1000;
+    private static final Queue<SessionEvent> bulkUpsertQueue = new CircularFifoQueue<>(MAX_BULK_SIZE);
     @Inject
     SelenographDB database;
     @Inject
@@ -103,18 +104,18 @@ public class SessionsAggregator implements StatsCounter {
     }
 
     public void flushBulkUpsertBuffer() {
-        LOGGER.info("Flushing upsert buffer. Queue size is {}", bulkUpsertQueue.size());
-        SessionEvent event;
-        final List<SessionEvent> events = new ArrayList<>();
-        while ((event = bulkUpsertQueue.poll()) != null) {
-            events.add(event);
-        }
-        if (!events.isEmpty()) {
-            try {
-                database.bulkUpsertSessions(events);
-            } catch (Exception e) {
-                LOGGER.error("Failed to perform bulk update of sessions", e);
+        try {
+            LOGGER.info("Flushing upsert buffer. Queue size is {}", bulkUpsertQueue.size());
+            SessionEvent event;
+            final List<SessionEvent> events = new ArrayList<>();
+            while ((event = bulkUpsertQueue.poll()) != null) {
+                events.add(event);
             }
+            if (!events.isEmpty()) {
+                database.bulkUpsertSessions(events);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to perform bulk update of sessions", e);
         }
     }
 
