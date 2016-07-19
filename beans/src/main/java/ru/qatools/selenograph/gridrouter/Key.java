@@ -18,10 +18,6 @@ public class Key {
     }
 
     public static String browserName(String name) {
-        return name.contains("-") ? name.split("\\-")[0] : name;
-    }
-
-    public static String byBrowserVersion(String browserName, String version) {
-        return browserName(browserName) + ":" + browserVersion(version);
+        return name;
     }
 }
