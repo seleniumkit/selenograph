@@ -1,7 +1,6 @@
 package ru.qatools.selenograph.ext.jackson;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.Deserializers;
@@ -39,7 +38,7 @@ public class SelenographDeserializers extends Deserializers.Base {
         }
 
         @Override
-        public Long deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+        public Long deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
             final boolean array = p.hasToken(JsonToken.START_ARRAY);
             if (p.hasToken(JsonToken.START_OBJECT) || array) {
                 p.nextToken();
@@ -65,7 +64,7 @@ public class SelenographDeserializers extends Deserializers.Base {
         }
 
         @Override
-        public Date deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+        public Date deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
             if (p.hasToken(JsonToken.START_OBJECT)) {
                 p.nextToken();
                 p.nextToken();

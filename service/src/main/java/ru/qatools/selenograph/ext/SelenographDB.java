@@ -207,7 +207,7 @@ public class SelenographDB {
     }
 
     public <T extends Document> void bulkUpsertSessions(Collection<SessionEvent> events) {
-        final BulkWriteResult res = sessions().bulkWrite(events.parallelStream().map((event) -> {
+        final BulkWriteResult res = sessions().bulkWrite(events.parallelStream().map(event -> {
             if (event instanceof DeleteSessionEvent) {
                 return new DeleteOneModel<T>(new Document("_id", event.getSessionId()));
             } else if (event instanceof UpdateSessionEvent) {
