@@ -1,7 +1,7 @@
 package ru.qatools.selenograph.gridrouter;
 
 import org.hamcrest.Matcher;
-import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
@@ -47,6 +47,11 @@ public class QuotaStatsAggregatorTest {
 
     @PluginMock
     GraphiteReportProcessor graphite;
+
+    @Before
+    public void tearDown() throws Exception {
+        db.clear();
+    }
 
     @Test
     public void testUpdateAfterRemoved() throws Exception {
@@ -136,11 +141,6 @@ public class QuotaStatsAggregatorTest {
         assertThat(statsFor("vasya").getMax(), is(2));
         assertThat(statsFor("vasya").getAvg(), is(2));
         assertThat(statsFor("vasya").getRaw(), is(2));
-    }
-
-    @After
-    public void tearDown() throws Exception {
-        db.deleteSessionsOlderThan(0L);
     }
 
     protected SessionsState statsFor(String user) {

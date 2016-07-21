@@ -3,6 +3,7 @@ package ru.qatools.selenograph.ext;
 import com.mongodb.MongoClient;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
@@ -240,4 +241,10 @@ public class SelenographDB {
         return mongo.getDatabase(dbName).getCollection(SESSIONS_COL_NAME);
     }
 
+    public void clear() {
+        MongoDatabase db = mongo.getDatabase(dbName);
+        for (String colName : db.listCollectionNames()) {
+            db.getCollection(colName).drop();
+        }
+    }
 }
