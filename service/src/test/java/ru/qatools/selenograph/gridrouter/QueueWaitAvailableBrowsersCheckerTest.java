@@ -1,9 +1,11 @@
 package ru.qatools.selenograph.gridrouter;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.qatools.gridrouter.config.Version;
+import ru.qatools.selenograph.ext.SelenographDB;
 import ru.yandex.qatools.camelot.test.*;
 
 import static com.jayway.awaitility.Awaitility.await;
@@ -37,13 +39,21 @@ public class QueueWaitAvailableBrowsersCheckerTest {
     @AggregatorState(QueueWaitAvailableBrowsersChecker.class)
     AggregatorStateStorage repo;
 
+    @Autowired
+    SelenographDB database;
+
+    @Before
+    public void setUp() throws Exception {
+        database.clear();
+    }
+
     @Test
     public void testCountEnqueuedRequests() throws Exception {
         final String reqId = randomUUID().toString();
         rangeClosed(0, 2).forEach(i -> queue.onWait("user", "firefox", version("33"), reqId, i));
         verify(mock, timeout(4000L).times(1)).onBeforeRequest(any(), any());
         verify(mock, timeout(4000L).times(1)).onEnqueued(any(), any());
-        await().atMost(2, SECONDS).until(() -> state("user-firefox-33"), notNullValue());
+        await().atMost(4, SECONDS).until(() -> state("user-firefox-33"), notNullValue());
 
         assertThat(state("user-firefox-33").size(), equalTo(1));
 
@@ -56,7 +66,7 @@ public class QueueWaitAvailableBrowsersCheckerTest {
     @Test
     public void testExpiredRequestsRemoval() throws Exception {
         queue.onWait("user", "firefox", version("33"), "reqId", 0);
-        await().atMost(2, SECONDS).until(() -> state("user-firefox-33"), notNullValue());
+        await().atMost(4, SECONDS).until(() -> state("user-firefox-33"), notNullValue());
         assertThat(state("user-firefox-33").size(), equalTo(1));
         sleep(1000);
         helper.invokeTimersFor(QueueWaitAvailableBrowsersChecker.class);
