@@ -22,13 +22,11 @@
         <xsd:attribute name="name"     type="xsd:string"/>
         <xsd:attribute name="running"  type="xsd:int" use="required"/>
         <xsd:attribute name="max"      type="xsd:int" use="required"/>
-        <xsd:attribute name="occupied" type="xsd:int" use="required"/>
     </xsd:complexType>
 
     <xsd:complexType name="VersionSummary">
         <xsd:attribute name="version"  type="xsd:string"/>
         <xsd:attribute name="running"  type="xsd:int" use="required"/>
         <xsd:attribute name="max"      type="xsd:int" use="required"/>
-        <xsd:attribute name="occupied" type="xsd:int" use="required"/>
     </xsd:complexType>
 </xsd:schema>
