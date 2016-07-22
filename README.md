@@ -249,33 +249,8 @@ This info is actually the mirror of the configured Gridrouter quotas enriched wi
 }
 ```
 
-### /api/selenograph/hubs
-Shows which browser versions are available on each hub host and also how many sessions are running per hub and browser version.
+### /api/selenograph/quota/:name
 
-```
-[  
-   {  
-      "timestamp":1456480920001,
-      "address":"firefox33-1.selenium.net:4444",
-      "active":true,
-      "max":5,
-      "running":0,
-      "browsers":[  
-         {  
-            "versions":[  
-               {  
-                  "version":"33.0",
-                  "running":0,
-                  "max":5
-               }
-            ],
-            "name":"firefox",
-            "running":0,
-            "max":5
-         }
-      ]
-   },
-   // ...
-]
+The same as `/api/selenograph/quotas`, but for the single quota name.
 
 ```
