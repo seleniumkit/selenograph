@@ -10,7 +10,7 @@ providing more information about currently running Selenium sessions and hubs st
 ## Requirements
 
 Unlike the original Grid Router, Selenograph has the shared state between nodes, which is stored in database.
-We use [MongoDB](https://www.mongodb.org/) as a database, because it provides high availability, fault tolerance and schema-less approach.
+We use [MongoDB](https://www.mongodb.org/) (v. 3.2+) as a database, because it provides high availability, fault tolerance and schema-less approach.
 Although it's recommended to use a replica set (at least 3 nodes of MongoDB), you can run just a single instance to play with Selenograph.
 
 ## Features
