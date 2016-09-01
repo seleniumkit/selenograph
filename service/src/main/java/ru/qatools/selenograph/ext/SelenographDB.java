@@ -64,8 +64,8 @@ public class SelenographDB {
                         final BrowserContext key = new UserBrowser().withBrowser(browserName(b.getName()))
                                 .withVersion(browserVersion(v.getNumber()))
                                 .withTimestamp(0);
-                        v.getRegions().parallelStream()
-                                .flatMap(r -> r.getHosts().parallelStream())
+                        v.getRegions().stream()
+                                .flatMap(r -> r.getHosts().stream())
                                 .forEach(h -> {
                                     final Pair<BrowserContext, String> pair = of(key, h.getAddress());
                                     if (!hubMax.containsKey(pair) || hubMax.get(pair) < h.getCount()) {
@@ -77,7 +77,7 @@ public class SelenographDB {
                     }));
         });
         res.put(ALL, new HashMap<>());
-        hubMax.entrySet().parallelStream().collect(groupingBy(e -> e.getKey().getKey(), summingInt(Map.Entry::getValue)))
+        hubMax.entrySet().stream().collect(groupingBy(e -> e.getKey().getKey(), summingInt(Map.Entry::getValue)))
                 .entrySet().forEach(e -> res.get(ALL).putIfAbsent(e.getKey(), e.getValue()));
         return res;
     }
@@ -208,7 +208,7 @@ public class SelenographDB {
     }
 
     public <T extends Document> void bulkUpsertSessions(Collection<SessionEvent> events) {
-        final BulkWriteResult res = sessions().bulkWrite(events.parallelStream().map(event -> {
+        final BulkWriteResult res = sessions().bulkWrite(events.stream().map(event -> {
             if (event instanceof DeleteSessionEvent) {
                 return new DeleteOneModel<T>(new Document("_id", event.getSessionId()));
             } else if (event instanceof UpdateSessionEvent) {
