@@ -1,6 +1,5 @@
 package ru.qatools.selenograph.gridrouter;
 
-import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +11,7 @@ import ru.yandex.qatools.camelot.common.ProcessingEngine;
 import javax.inject.Inject;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 import static java.lang.System.currentTimeMillis;
 import static ru.qatools.selenograph.gridrouter.Key.browserName;
@@ -24,8 +24,8 @@ import static ru.yandex.qatools.camelot.api.Constants.Keys.ALL;
 public class SessionsAggregator implements StatsCounter {
     static final String ROUTE_REGEX = "http://([^:]+):(\\d+)";
     private static final Logger LOGGER = LoggerFactory.getLogger(SessionsAggregator.class);
-    private static final int MAX_BULK_SIZE = 1000;
-    private static final Queue<SessionEvent> bulkUpsertQueue = new CircularFifoQueue<>(MAX_BULK_SIZE);
+    private static final Queue<SessionEvent> bulkUpsertQueue = new ConcurrentLinkedDeque<>();
+
     @Inject
     SelenographDB database;
     @Inject
@@ -56,19 +56,19 @@ public class SessionsAggregator implements StatsCounter {
                 .withBrowser(name)
                 .withVersion(ver)
                 .withTimestamp(currentTimeMillis());
-        bulkUpsertQueue.add(startEvent);
+        bulkUpsertQueue.offer(startEvent);
     }
 
     @Override
     public void deleteSession(String sessionId, String route) {
         LOGGER.info("Removing session {} ({})", sessionId, route);
-        bulkUpsertQueue.add(new DeleteSessionEvent().withSessionId(sessionId).withRoute(route));
+        bulkUpsertQueue.offer(new DeleteSessionEvent().withSessionId(sessionId).withRoute(route));
     }
 
     @Override
     public void updateSession(String sessionId, String route) {
         LOGGER.info("Updating session {} ({})", sessionId, route);
-        bulkUpsertQueue.add((SessionEvent) new UpdateSessionEvent()
+        bulkUpsertQueue.offer((SessionEvent) new UpdateSessionEvent()
                 .withSessionId(sessionId).withRoute(route).withTimestamp(currentTimeMillis()));
     }
 
@@ -116,6 +116,7 @@ public class SessionsAggregator implements StatsCounter {
             }
         } catch (Exception e) {
             LOGGER.error("Failed to perform bulk update of sessions", e);
+            bulkUpsertQueue.clear();
         }
     }
 
