@@ -5,7 +5,7 @@
     <groupId>ru.qatools.seleniumkit</groupId>
     <artifactId>selenograph</artifactId>
     <packaging>pom</packaging>
-    <version>1.2</version>
+    <version>1.3-SNAPSHOT</version>
 
     <parent>
         <groupId>org.sonatype.oss</groupId>
@@ -31,7 +31,7 @@
         <connection>scm:git:git@github.com:seleniumkit/selenograph.git</connection>
         <developerConnection>scm:git:git@github.com:seleniumkit/selenograph.git</developerConnection>
         <url>scm:git:git@github.com:seleniumkit/selenograph.git</url>
-        <tag>selenograph-1.2</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <dependencyManagement>
